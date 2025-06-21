@@ -16,7 +16,10 @@ GRAVITY = 0.2
 FRICTION = 0.02
 spawn_radius = 1
 random_velocity = False
-random_spawn = 1
+random_spawn = 0.75
+SAND_ID = 1
+WATER_ID = 2
+current_material = SAND_ID # Start with sand
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -24,6 +27,7 @@ pygame.display.set_caption("Falling Sand Simulator")
 clock = pygame.time.Clock()
 manager = pygame_gui.UIManager((WINDOW_WIDTH, WINDOW_HEIGHT))
 
+tab = ["sand", "water"]
 
 brush_slider = pygame_gui.elements.UIHorizontalSlider(
     relative_rect=pygame.Rect((820, 100), (200, 30)),
@@ -38,6 +42,26 @@ brush_label = pygame_gui.elements.UILabel(
 )
 
 
+sand_button = pygame_gui.elements.UIButton(
+    relative_rect=pygame.Rect((820, 200), (95, 50)), 
+    text="Sand",
+    manager=manager,
+    object_id=pygame_gui.core.ObjectID(class_id='@material_button', object_id='#sand_button')
+)
+
+water_button = pygame_gui.elements.UIButton(
+    relative_rect=pygame.Rect((925, 200), (95, 50)), 
+    text="Water",
+    manager=manager,
+    object_id=pygame_gui.core.ObjectID(class_id='@material_button', object_id='#water_button')
+)
+
+material_display_label = pygame_gui.elements.UILabel(
+    relative_rect=pygame.Rect((820, 260), (200, 30)),
+    text=f"Current: {tab[current_material-1]}",
+    manager=manager
+)
+
 # Colors
 SAND_COLORS = [
     (210, 180, 140),
@@ -45,20 +69,29 @@ SAND_COLORS = [
     (244, 213, 141),
     (178, 153, 110),
 ]
+WATER_COLORS = [
+    (65, 105, 225),   
+    (0, 0, 128),     
+    (25, 25, 112)
+]
+
 EMPTY_COLOR = (0, 0, 0)
 
+
 class Particle:
-    def __init__(self, x, y, color):
+    def __init__(self, type, x, y, color):
+        self.type = type
         self.x = x
         self.y = y
         self.tx = float(x)
         self.ty = float(y)
         self.vx = 0.0
-        self.vy = 0.0
+        self.vy = 1
         self.color = color
-    
+
     def __repr__(self):
         return f"P(x:{self.x}, y:{self.y})"
+
 
 grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
 active_particles = set()
@@ -66,19 +99,26 @@ active_particles_copy = set()
 particles_to_clear = set()
 particles_to_draw = set()
 
+
+grid_surface = pygame.Surface(screen.get_size()).convert()
+grid_surface.fill(EMPTY_COLOR) 
+
 def draw_grid():
     for (x, y) in particles_to_clear:
-        pygame.draw.rect(screen, EMPTY_COLOR, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        pygame.draw.rect(grid_surface, EMPTY_COLOR, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+
     for p in particles_to_draw:
-        pygame.draw.rect(screen, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+
     particles_to_clear.clear()
     particles_to_draw.clear()
-    
+
+    screen.blit(grid_surface, (0, 0))
+
 
 def update_near_particles(x, y):
-    for uy in range(y - 1, y):
-        if uy < 0 or uy >= GRID_HEIGHT:
-            continue
+    uy = y-1
+    if not (uy < 0 or uy >= GRID_HEIGHT):
         for ux in range(x - 1, x + 2):
             if ux < 0 or ux >= GRID_WIDTH:
                 continue
@@ -87,16 +127,20 @@ def update_near_particles(x, y):
                 if p not in active_particles:
                     active_particles_copy.add(p)
                     active_particles.add(p)
-                
-
-
+    for ux in [-1, 1]:
+        if ux < GRID_WIDTH and ux > 0:
+            p = grid[y][ux]
+            if p is not None and p.type == WATER_ID:
+                if p not in active_particles:
+                    active_particles_copy.add(p)
+                    active_particles.add(p)
 
 def update_particles():
     global grid, active_particles, active_particles_copy, particles_to_clear, particles_to_draw
-    #new_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
+    # new_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
     for x, y in particles_to_clear:
         grid[y][x] = None
-    #particles_to_clear.clear()
+    # particles_to_clear.clear()
     active_particles_copy = active_particles.copy()
 
     while active_particles_copy:
@@ -125,25 +169,51 @@ def update_particles():
                 int_target_y = round(target_ty)
 
                 if abs(int_target_x - p.x) <= 1 and abs(int_target_y - p.y) <= 1:
-                    path = [(p.x, p.y), (int_target_x, int_target_y)]
+                    path = [(previous_x, previous_y), (int_target_x, int_target_y)]
                 else:
-                    path = get_line(p.x, p.y, int_target_x, int_target_y)
-                last_valid = (p.x, p.y)
+                    path = get_line(previous_x, previous_y, int_target_x, int_target_y)
+                
+                last_empty = (previous_x, previous_y)
+                final_x, final_y = previous_x, previous_y
                 collision = False
-
+                
                 for nx, ny in path[1:]:
                     if not (0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT):
                         collision = True
                         break
-                    if grid[ny][nx] is None:
-                        last_valid = (nx, ny)
-                    else:
+                    cell_content = grid[ny][nx]
+
+                    if cell_content is None:
+                        final_x, final_y = nx, ny 
+                        last_empty = (nx, ny)
+                        continue
+
+                    elif cell_content.type == WATER_ID and p.type == SAND_ID: # Sand encounters Water
+                        final_x, final_y = nx, ny 
+                        continue
+
+                    else: 
                         collision = True
                         break
 
-                if last_valid != (p.x, p.y):
-                    grid[p.y][p.x] = None
-                    p.x, p.y = last_valid
+                if (previous_x, previous_y) != (final_x, final_y):
+                    grid[previous_y][previous_x] = None
+                    p.x, p.y = final_x, final_y
+
+                    if cell_content is not None and cell_content.type == WATER_ID:
+                        water_particle = cell_content
+
+                        
+                        water_particle.x = last_empty[0]
+                        water_particle.y = last_empty[1]
+                        water_particle.tx = water_particle.x
+                        water_particle.ty = water_particle.y
+                        grid[water_particle.y][water_particle.x] = water_particle
+                        if water_particle not in active_particles:
+                            active_particles_copy.add(water_particle)
+                            active_particles.add(water_particle)
+                        particles_to_draw.add(water_particle) 
+                                        
                     if collision:
                         p.tx, p.ty = p.x, p.y
                         p.vx *= 0.5
@@ -152,18 +222,59 @@ def update_particles():
                         p.tx = target_tx
                         p.ty = target_ty
                     moved = True
-
+ 
                 if not moved:
                     # diagonals
                     for dx in random.sample([-1, 1], 2):
                         nx = p.x + dx
                         ny = p.y + 1
-                        if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT and grid[ny][nx] is None:
-                            grid[p.y][p.x] = None
-                            p.x, p.y = nx, ny
+                        if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT:
+                            if grid[ny][nx] is None:
+                                grid[p.y][p.x] = None
+                                p.x, p.y = nx, ny
+                                p.tx, p.ty = p.x, p.y
+                                moved = True
+                                break
+                            elif p.type == SAND_ID and grid[ny][nx].type == WATER_ID:
+                                water_particle = grid[ny][nx] 
+                                water_particle.x = last_empty[0]
+                                water_particle.y = last_empty[1]
+                                water_particle.tx = water_particle.x
+                                water_particle.ty = water_particle.y
+                                grid[water_particle.y][water_particle.x] = water_particle
+                                if water_particle not in active_particles:
+                                    active_particles_copy.add(water_particle)
+                                    active_particles.add(water_particle)
+                                particles_to_draw.add(water_particle)
+                                p.x, p.y = nx, ny
+                                p.tx, p.ty = p.x, p.y
+                                moved = True
+                                break
+
+                
+                if not moved and p.type == WATER_ID: #move randomly to the sides
+                    for dx in random.sample([-4, -1, 1, 4], 4):
+                        if dx < 0:
+                            path = [p.x - i for i in range(1, abs(dx)+ 1)]
+                        else:
+                            path = [p.x + i for i in range(1, dx + 1)]
+                        last_valid = (p.x, p.y)
+
+                        for nx in path:
+                            if not 0 <= nx < GRID_WIDTH:
+                                break
+                            if grid[p.y][nx] is None:
+                                last_valid = (nx, p.y)
+                            else:
+                                break
+
+                        if last_valid != (previous_x, previous_y):
+                            grid[previous_y][previous_x] = None
+                            p.x, p.y = last_valid
                             p.tx, p.ty = p.x, p.y
                             moved = True
                             break
+
 
                 # Update grid
                 grid[p.y][p.x] = p
@@ -175,8 +286,9 @@ def update_particles():
                 else:
                     active_particles.discard(p)
                     p.vx = 0
-                    p.vy = 1
-    
+                    p.vy = 0
+
+
 def get_line(x0, y0, x1, y1):
     points = []
     dx = abs(x1 - x0)
@@ -198,6 +310,7 @@ def get_line(x0, y0, x1, y1):
             y0 += sy
     return points
 
+
 # Main loop
 prev_pos = None
 running = True
@@ -210,6 +323,13 @@ while running:
             if event.user_type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED and event.ui_element == brush_slider:
                 spawn_radius = int(event.value)
                 brush_label.set_text(f"Brush Size: {spawn_radius}")
+            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == sand_button:
+                    current_material = SAND_ID
+                elif event.ui_element == water_button:
+                    current_material = WATER_ID
+
+                material_display_label.set_text(f"Current: {tab[current_material-1]}")
         manager.process_events(event)
     manager.update(time_delta)
     # Mouse actions
@@ -217,49 +337,68 @@ while running:
     if any(mouse_buttons):
         mx, my = pygame.mouse.get_pos()
         gx, gy = mx // CELL_SIZE, my // CELL_SIZE
-        
+
         if prev_pos != None:
             for x, y in get_line(prev_pos[0], prev_pos[1], gx, gy):
                 if random_velocity:
                     vx = random.randint(-5, 5)
                     vy = random.randint(-5, 5)
-                if mouse_buttons[0]: # Left click // Sand
-                    for dx in range(-spawn_radius, spawn_radius+1):
-                        for dy in range(-spawn_radius, spawn_radius+1):
-                            nx, ny = x + dx, y + dy
-                            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:                            
-                                if random_spawn >= random.random(): 
-                                    if grid[ny][nx] is None:
-                                        p = Particle(nx, ny, random.choice(SAND_COLORS))
-                                        if random_velocity:
-                                            p.vx = vx
-                                            p.vy = vy
-                                        grid[ny][nx] = p
-                                        active_particles.add(p)
-                                        particles_to_draw.add(p)
-                            
-                elif mouse_buttons[2]: # Right click // Air
+                if mouse_buttons[0]:  # Left click // Sand
+                    if current_material == SAND_ID:
+                        for dx in range(-spawn_radius, spawn_radius+1):
+                            for dy in range(-spawn_radius, spawn_radius+1):
+                                nx, ny = x + dx, y + dy
+                                if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                                    if random_spawn >= random.random():
+                                        if grid[ny][nx] is None:
+                                            p = Particle(
+                                                SAND_ID, nx, ny, random.choice(SAND_COLORS))
+                                            if random_velocity:
+                                                p.vx = vx
+                                                p.vy = vy
+                                            grid[ny][nx] = p
+                                            active_particles.add(p)
+                                            particles_to_draw.add(p)
+                    elif current_material == WATER_ID:
+                        for dx in range(-spawn_radius, spawn_radius+1):
+                            for dy in range(-spawn_radius, spawn_radius+1):
+                                nx, ny = x + dx, y + dy
+                                if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                                    if random_spawn >= random.random():
+                                        if grid[ny][nx] is None:
+                                            p = Particle(
+                                                WATER_ID, nx, ny, random.choice(WATER_COLORS))
+                                            if random_velocity:
+                                                p.vx = vx
+                                                p.vy = vy
+                                            grid[ny][nx] = p
+                                            active_particles.add(p)
+                                            particles_to_draw.add(p)
+
+                elif mouse_buttons[2]:  # Right click // Air
                     for dx in range(-spawn_radius, spawn_radius+1):
                         for dy in range(-spawn_radius, spawn_radius+1):
                             nx, ny = x + dx, y + dy
                             if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
                                 if random_spawn >= random.random():
                                     p = grid[ny][nx]
-                                    if p is not None:   
-                                        active_particles.discard(p) 
+                                    if p is not None:
+                                        active_particles.discard(p)
                                         grid[ny][nx] = None
                                         update_near_particles(nx, ny)
                                         particles_to_clear.add((nx, ny))
                                         particles_to_draw.discard(p)
-        
-        prev_pos = (gx, gy)  
+
+        prev_pos = (gx, gy)
     else:
-        prev_pos = None          
+        prev_pos = None
 
     update_particles()
-    #screen.fill(EMPTY_COLOR)
-    pygame.draw.rect(screen, (30, 30, 30), (WINDOW_WIDTH - TOOLBAR_WIDTH, 0, TOOLBAR_WIDTH, WINDOW_HEIGHT))
+    # screen.fill(EMPTY_COLOR)
+    
     draw_grid()
+    pygame.draw.rect(screen, (30, 30, 30), (WINDOW_WIDTH -
+                     TOOLBAR_WIDTH, 0, TOOLBAR_WIDTH, WINDOW_HEIGHT))
     manager.draw_ui(screen)
     pygame.display.flip()
     clock.tick(60)

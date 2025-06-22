@@ -2,10 +2,11 @@ import pygame
 import pygame_gui
 import random
 import math
+import os
 
 
 # Settings
-CELL_SIZE = 10
+CELL_SIZE = 20
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -20,46 +21,56 @@ random_spawn = 0.75
 SAND_ID = 1
 WATER_ID = 2
 current_material = SAND_ID # Start with sand
+simulation_is_on = True
 
 pygame.init()
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Falling Sand Simulator")
 clock = pygame.time.Clock()
-manager = pygame_gui.UIManager((WINDOW_WIDTH, WINDOW_HEIGHT))
+
+manager = pygame_gui.UIManager((WINDOW_WIDTH, WINDOW_HEIGHT), r'C:\Users\oscar\OneDrive\Documents\Python\Sandbox game\gui_theme.json')
+
 
 tab = ["sand", "water"]
 
 brush_slider = pygame_gui.elements.UIHorizontalSlider(
-    relative_rect=pygame.Rect((820, 100), (200, 30)),
+    relative_rect=pygame.Rect((900, 100), (200, 30)),
     start_value=spawn_radius,
     value_range=(0, 15),
     manager=manager
 )
 brush_label = pygame_gui.elements.UILabel(
-    relative_rect=pygame.Rect((820, 140), (200, 30)),
+    relative_rect=pygame.Rect((900, 140), (200, 30)),
     text=f"Brush Size: {spawn_radius}",
     manager=manager
 )
 
 
 sand_button = pygame_gui.elements.UIButton(
-    relative_rect=pygame.Rect((820, 200), (95, 50)), 
+    relative_rect=pygame.Rect((900, 200), (95, 50)), 
     text="Sand",
     manager=manager,
     object_id=pygame_gui.core.ObjectID(class_id='@material_button', object_id='#sand_button')
 )
 
 water_button = pygame_gui.elements.UIButton(
-    relative_rect=pygame.Rect((925, 200), (95, 50)), 
+    relative_rect=pygame.Rect((1005, 200), (95, 50)), 
     text="Water",
     manager=manager,
     object_id=pygame_gui.core.ObjectID(class_id='@material_button', object_id='#water_button')
 )
 
 material_display_label = pygame_gui.elements.UILabel(
-    relative_rect=pygame.Rect((820, 260), (200, 30)),
+    relative_rect=pygame.Rect((900, 260), (200, 30)),
     text=f"Current: {tab[current_material-1]}",
     manager=manager
+)
+
+pause_button = pygame_gui.elements.UIButton(
+    relative_rect=pygame.Rect((900, 320), (95, 50)), 
+    text="ON",
+    manager=manager,
+    object_id=pygame_gui.core.ObjectID(class_id='@material_button', object_id='#pause_button')
 )
 
 # Colors
@@ -85,7 +96,7 @@ class Particle:
         self.y = y
         self.tx = float(x)
         self.ty = float(y)
-        self.vx = 0.0
+        self.vx = 0
         self.vy = 1
         self.color = color
 
@@ -330,6 +341,12 @@ while running:
                     current_material = SAND_ID
                 elif event.ui_element == water_button:
                     current_material = WATER_ID
+                elif event.ui_element == pause_button:
+                    simulation_is_on = not simulation_is_on
+                    if simulation_is_on:
+                        pause_button.set_text("ON")
+                    else:
+                         pause_button.set_text("OFF")
 
                 material_display_label.set_text(f"Current: {tab[current_material-1]}")
         manager.process_events(event)
@@ -339,64 +356,64 @@ while running:
     if any(mouse_buttons):
         mx, my = pygame.mouse.get_pos()
         gx, gy = mx // CELL_SIZE, my // CELL_SIZE
+        if 0 <= gx < GRID_WIDTH and 0 <= gy < GRID_HEIGHT:
+            if prev_pos != None:
+                for x, y in get_line(prev_pos[0], prev_pos[1], gx, gy):
+                    if random_velocity:
+                        vx = random.randint(-5, 5)
+                        vy = random.randint(-5, 5)
+                    if mouse_buttons[0]:  # Left click // Sand
+                        if current_material == SAND_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                                        if random_spawn >= random.random():
+                                            if grid[ny][nx] is None:
+                                                p = Particle(
+                                                    SAND_ID, nx, ny, random.choice(SAND_COLORS))
+                                                if random_velocity:
+                                                    p.vx = vx
+                                                    p.vy = vy
+                                                grid[ny][nx] = p
+                                                active_particles.add(p)
+                                                particles_to_draw.add(p)
+                        elif current_material == WATER_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                                        if random_spawn >= random.random():
+                                            if grid[ny][nx] is None:
+                                                p = Particle(
+                                                    WATER_ID, nx, ny, random.choice(WATER_COLORS))
+                                                if random_velocity:
+                                                    p.vx = vx
+                                                    p.vy = vy
+                                                grid[ny][nx] = p
+                                                active_particles.add(p)
+                                                particles_to_draw.add(p)
 
-        if prev_pos != None:
-            for x, y in get_line(prev_pos[0], prev_pos[1], gx, gy):
-                if random_velocity:
-                    vx = random.randint(-5, 5)
-                    vy = random.randint(-5, 5)
-                if mouse_buttons[0]:  # Left click // Sand
-                    if current_material == SAND_ID:
+                    elif mouse_buttons[2]:  # Right click // Air
                         for dx in range(-spawn_radius, spawn_radius+1):
                             for dy in range(-spawn_radius, spawn_radius+1):
                                 nx, ny = x + dx, y + dy
                                 if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
                                     if random_spawn >= random.random():
-                                        if grid[ny][nx] is None:
-                                            p = Particle(
-                                                SAND_ID, nx, ny, random.choice(SAND_COLORS))
-                                            if random_velocity:
-                                                p.vx = vx
-                                                p.vy = vy
-                                            grid[ny][nx] = p
-                                            active_particles.add(p)
-                                            particles_to_draw.add(p)
-                    elif current_material == WATER_ID:
-                        for dx in range(-spawn_radius, spawn_radius+1):
-                            for dy in range(-spawn_radius, spawn_radius+1):
-                                nx, ny = x + dx, y + dy
-                                if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                                    if random_spawn >= random.random():
-                                        if grid[ny][nx] is None:
-                                            p = Particle(
-                                                WATER_ID, nx, ny, random.choice(WATER_COLORS))
-                                            if random_velocity:
-                                                p.vx = vx
-                                                p.vy = vy
-                                            grid[ny][nx] = p
-                                            active_particles.add(p)
-                                            particles_to_draw.add(p)
-
-                elif mouse_buttons[2]:  # Right click // Air
-                    for dx in range(-spawn_radius, spawn_radius+1):
-                        for dy in range(-spawn_radius, spawn_radius+1):
-                            nx, ny = x + dx, y + dy
-                            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                                if random_spawn >= random.random():
-                                    p = grid[ny][nx]
-                                    if p is not None:
-                                        active_particles.discard(p)
-                                        grid[ny][nx] = None
-                                        update_near_particles(nx, ny)
-                                        particles_to_clear.add((nx, ny))
-                                        particles_to_draw.discard(p)
+                                        p = grid[ny][nx]
+                                        if p is not None:
+                                            active_particles.discard(p)
+                                            grid[ny][nx] = None
+                                            update_near_particles(nx, ny)
+                                            particles_to_clear.add((nx, ny))
+                                            particles_to_draw.discard(p)
 
         prev_pos = (gx, gy)
     else:
         prev_pos = None
-
-    update_particles()
-    # screen.fill(EMPTY_COLOR)
+    
+    if simulation_is_on:
+        update_particles()
     draw_grid()
     particles_to_clear.clear()
     particles_to_draw.clear()
@@ -404,6 +421,6 @@ while running:
                      TOOLBAR_WIDTH, 0, TOOLBAR_WIDTH, WINDOW_HEIGHT))
     manager.draw_ui(screen)
     pygame.display.flip()
-    clock.tick(60)
+    clock.tick(60)  
 
 pygame.quit()

@@ -6,7 +6,7 @@ import os
 
 
 # ------------------------Settings-------------------------------
-CELL_SIZE = 20
+CELL_SIZE = 5
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -131,9 +131,6 @@ material_display_label = pygame_gui.elements.UILabel(
 )
 
 
-
-
-
 # Colors
 SAND_COLORS = [
     (210, 180, 140),
@@ -142,9 +139,10 @@ SAND_COLORS = [
     (178, 153, 110),
 ]
 WATER_COLORS = [
-    (65, 105, 225),   
-    (0, 0, 128),     
-    (25, 25, 112)
+    (80, 140, 200),
+    (40, 100, 160), 
+    (10, 70, 130),  
+    (0, 40, 90)   
 ]
 
 EMPTY_COLOR = (0, 0, 0)
@@ -279,8 +277,8 @@ def update_particles():
                             active_particles_copy.add(water_particle)
                             active_particles.add(water_particle)
                         particles_to_draw.add(water_particle) 
-                        p.vx *= 0.6
-                        p.vy *= 0.6
+                        p.vx *= 0.5
+                        p.vy *= 0.5
                                         
                     if collision:
                         p.tx, p.ty = p.x, p.y

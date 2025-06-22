@@ -185,7 +185,7 @@ def update_particles():
 
                     elif cell_content.type == WATER_ID and p.type == SAND_ID: # Sand encounters Water
                         final_x, final_y = nx, ny 
-                        continue
+                        break
 
                     else: 
                         collision = True
@@ -194,11 +194,10 @@ def update_particles():
                 if (previous_x, previous_y) != (final_x, final_y):
                     grid[previous_y][previous_x] = None
                     p.x, p.y = final_x, final_y
-
+                    grid[p.y][p.x] = None
+                    
                     if cell_content is not None and p.type != WATER_ID and cell_content.type == WATER_ID:
                         water_particle = cell_content
-
-                        
                         water_particle.x = last_empty[0]
                         water_particle.y = last_empty[1]
                         water_particle.tx = water_particle.x
@@ -227,24 +226,28 @@ def update_particles():
                         ny = p.y + 1
                         if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT:
                             if grid[ny][nx] is None:
-                                grid[p.y][p.x] = None
+                                grid[previous_y][previous_x] = None
                                 p.x, p.y = nx, ny
                                 p.tx, p.ty = p.x, p.y
                                 moved = True
                                 break
                             elif p.type == SAND_ID and grid[ny][nx].type == WATER_ID:
                                 water_particle = grid[ny][nx] 
-                                water_particle.x = last_empty[0]
-                                water_particle.y = last_empty[1]
-                                water_particle.tx = water_particle.x
-                                water_particle.ty = water_particle.y
-                                grid[water_particle.y][water_particle.x] = water_particle
+                                grid[p.y][p.x] = None
+                                grid[ny][nx] = None
+                                grid[previous_y][previous_x] = water_particle
+                                water_particle.x, water_particle.tx  = previous_x, previous_x
+                                water_particle.y, water_particle.ty = previous_y, previous_y
+                                p.x, p.y = nx, ny
+
+                                p.tx, p.ty = float(p.x), float(p.y)
+                                #p.vx *= 0.6 
+                                #p.vy *= 0.6  
+                                
                                 if water_particle not in active_particles:
                                     active_particles_copy.add(water_particle)
                                     active_particles.add(water_particle)
                                 particles_to_draw.add(water_particle)
-                                p.x, p.y = nx, ny
-                                p.tx, p.ty = p.x, p.y
                                 moved = True
                                 break
 

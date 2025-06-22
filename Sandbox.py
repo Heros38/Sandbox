@@ -5,7 +5,7 @@ import math
 
 
 # Settings
-CELL_SIZE = 5
+CELL_SIZE = 10
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -110,9 +110,6 @@ def draw_grid():
     for p in particles_to_draw:
         pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
-    particles_to_clear.clear()
-    particles_to_draw.clear()
-
     screen.blit(grid_surface, (0, 0))
 
 
@@ -128,8 +125,8 @@ def update_near_particles(x, y):
                     active_particles_copy.add(p)
                     active_particles.add(p)
     for ux in [-1, 1]:
-        if ux < GRID_WIDTH and ux > 0:
-            p = grid[y][ux]
+        if x + ux < GRID_WIDTH and x + ux > 0:
+            p = grid[y][x + ux]
             if p is not None and p.type == WATER_ID:
                 if p not in active_particles:
                     active_particles_copy.add(p)
@@ -138,9 +135,6 @@ def update_near_particles(x, y):
 def update_particles():
     global grid, active_particles, active_particles_copy, particles_to_clear, particles_to_draw
     # new_grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-    for x, y in particles_to_clear:
-        grid[y][x] = None
-    # particles_to_clear.clear()
     active_particles_copy = active_particles.copy()
 
     while active_particles_copy:
@@ -150,6 +144,7 @@ def update_particles():
         active_particles_copy = set()
         for y in range(GRID_HEIGHT - 1, -1, -1):
             for p in buckets[y]:
+                #p.color = (200, 50, 50)
                 previous_x, previous_y = p.x, p.y
 
                 V2 = p.vx**2 + p.vy**2
@@ -200,7 +195,7 @@ def update_particles():
                     grid[previous_y][previous_x] = None
                     p.x, p.y = final_x, final_y
 
-                    if cell_content is not None and cell_content.type == WATER_ID:
+                    if cell_content is not None and p.type != WATER_ID and cell_content.type == WATER_ID:
                         water_particle = cell_content
 
                         
@@ -213,6 +208,8 @@ def update_particles():
                             active_particles_copy.add(water_particle)
                             active_particles.add(water_particle)
                         particles_to_draw.add(water_particle) 
+                        p.vx *= 0.6
+                        p.vy *= 0.6
                                         
                     if collision:
                         p.tx, p.ty = p.x, p.y
@@ -284,9 +281,11 @@ def update_particles():
                     particles_to_clear.add((previous_x, previous_y))
                     particles_to_draw.add(p)
                 else:
+                    #p.color = (50, 200, 50)
+                    #particles_to_draw.add(p)
                     active_particles.discard(p)
                     p.vx = 0
-                    p.vy = 0
+                    p.vy = 1
 
 
 def get_line(x0, y0, x1, y1):
@@ -395,8 +394,9 @@ while running:
 
     update_particles()
     # screen.fill(EMPTY_COLOR)
-    
     draw_grid()
+    particles_to_clear.clear()
+    particles_to_draw.clear()
     pygame.draw.rect(screen, (30, 30, 30), (WINDOW_WIDTH -
                      TOOLBAR_WIDTH, 0, TOOLBAR_WIDTH, WINDOW_HEIGHT))
     manager.draw_ui(screen)

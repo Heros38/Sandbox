@@ -1,12 +1,15 @@
 import pygame
-import pygame_gui
+import pygame_widgets
+from pygame_widgets.button import Button
+from pygame_widgets.slider import Slider
+from pygame_widgets.textbox import TextBox
 import random
 import math
 import os
 
 
 # ------------------------Settings-------------------------------
-CELL_SIZE = 5
+CELL_SIZE = 20
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -15,7 +18,7 @@ GRID_WIDTH = (WINDOW_WIDTH - TOOLBAR_WIDTH) // CELL_SIZE
 
 GRAVITY = 0.2
 FRICTION = 0.02
-spawn_radius = 1
+spawn_radius = 0
 random_velocity = False
 random_spawn = 0.75
 SAND_ID = 1
@@ -28,107 +31,128 @@ screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
 pygame.display.set_caption("Falling Sand Simulator")
 clock = pygame.time.Clock()
 
-manager = pygame_gui.UIManager((WINDOW_WIDTH, WINDOW_HEIGHT))
 
 material_names = ["sand", "water"]
 
+# -------------------------------- UI --------------------------------
 
-# -----------------------------Stolen button class-------------------------------------
-main_font = pygame.font.SysFont("cambria", 20)
-class Button():
-    def __init__(self, image, x_pos, y_pos, text_input, initial_text_color, hover_text_color):
-        self.image = image
-        self.x_pos = x_pos
-        self.y_pos = y_pos
-        self.rect = self.image.get_rect(center=(self.x_pos, self.y_pos))
-        self.text_input = text_input
-        self.initial_text_color = initial_text_color
-        self.hover_text_color = hover_text_color
-        # Render initial text color
-        self.text = main_font.render(self.text_input, True, self.initial_text_color)
-        self.text_rect = self.text.get_rect(center=(self.x_pos, self.y_pos))
+def set_sand_material():
+    global current_material
+    current_material = SAND_ID
+    material_label.setText("Current: Sand")
 
-    def update(self):
-        screen.blit(self.image, self.rect)
-        screen.blit(self.text, self.text_rect)
+def set_water_material():
+    global current_material
+    current_material = WATER_ID
+    material_label.setText("Current: Water")
 
-    def checkForInput(self, position):
-        # Use collidepoint for more accurate collision detection
-        if self.rect.collidepoint(position):
-            return True
-        return False
+def  toggle_simulation():
+    global simulation_is_on
+    simulation_is_on = not simulation_is_on
+    if simulation_is_on:
+        pause_button.setText("ON")
+        pause_button.inactiveColour = (40, 167, 69)
+        pause_button.hoverColour = (33, 136, 56)   
+        pause_button.pressedColour = (30, 126, 52)  
+    else:
+        pause_button.setText("OFF")
+        pause_button.inactiveColour = (220, 53, 69) 
+        pause_button.hoverColour = (200, 48, 60)    
+        pause_button.pressedColour = (180, 40, 50)  
 
-    def changeColor(self, position):
-        # Changes text color based on mouse hover
-        if self.rect.collidepoint(position):
-            self.text = main_font.render(self.text_input, True, self.hover_text_color)
-        else:
-            self.text = main_font.render(self.text_input, True, self.initial_text_color)
+sand_button = Button(
+    screen,  
+    900,  # X-coordinate of top left corner 
+    200,  # Y-coordinate of top left corner 
+    95,  # Width 
+    50,  # Height 
 
-    def set_text(self, new_text, new_text_color=None):
-        """Allows changing the button's display text and its default color."""
-        self.text_input = new_text
-        if new_text_color:
-            self.initial_text_color = new_text_color
-        # Re-render the text with the current initial color
-        self.text = main_font.render(self.text_input, True, self.initial_text_color)
-        self.text_rect = self.text.get_rect(center=(self.x_pos, self.y_pos))
-
-
-brush_slider = pygame_gui.elements.UIHorizontalSlider(
-    relative_rect=pygame.Rect((900, 100), (200, 30)),
-    start_value=spawn_radius,
-    value_range=(0, 15),
-    manager=manager
-)
-brush_label = pygame_gui.elements.UILabel(
-    relative_rect=pygame.Rect((900, 140), (200, 30)),
-    text=f"Brush Size: {spawn_radius}",
-    manager=manager
+    text="Sand",  
+    font=pygame.font.SysFont("Arial", 24, bold=True), 
+    margin=10,  
+    textColour=(51, 51, 51), 
+    inactiveColour=(255, 204, 0),  
+    hoverColour=(224, 184, 0),  
+    pressedColour=(192, 168, 0),  
+    radius=10,  
+    onClick=set_sand_material  
 )
 
+water_button = Button(
+    screen,  
+    1005,  # X-coordinate of top left corner 
+    200,  # Y-coordinate of top left corner
+    95,  # Width
+    50,  # Height
 
-sand_button_image = pygame.Surface((95, 50))
-sand_button_image.fill(pygame.Color('#FFCC00')) 
-water_button_image = pygame.Surface((95, 50))
-water_button_image.fill(pygame.Color('#007BFF')) 
-pause_button_image = pygame.Surface((95, 50))
-pause_button_image.fill(pygame.Color('#28A745')) 
-
-
-sand_btn_custom = Button(
-    image=sand_button_image,
-    x_pos=900 + 95 // 2, 
-    y_pos=200 + 50 // 2, 
-    text_input="Sand",
-    initial_text_color=pygame.Color('#333333'),
-    hover_text_color=pygame.Color('#111111')    
+    text="Water",  
+    font=pygame.font.SysFont("Arial", 24, bold=True), 
+    margin=10, 
+    textColour=(255, 255, 255), 
+    inactiveColour=(0, 123, 255),  
+    hoverColour=(0, 86, 179),  
+    pressedColour=(0, 64, 133),  
+    radius=10,  
+    onClick=set_water_material  
 )
 
-water_btn_custom = Button(
-    image=water_button_image,
-    x_pos=1005 + 95 // 2, 
-    y_pos=200 + 50 // 2, 
-    text_input="Water",
-    initial_text_color=pygame.Color('#FFFFFF'), 
-    hover_text_color=pygame.Color('#F0F0F0')    
+material_label = TextBox(
+    screen, 
+    940, 260, # X, Y 
+    120, 30, # Width, Height 
+    font=pygame.font.SysFont("Arial", 18),
+    textColour=(255, 255, 255),
+    borderThickness=0, 
+    colour=(35, 38, 45), 
+    radius=5, 
+    maxInput=None 
+)
+material_label.setText(f"Current: Sand") 
+material_label.disable() 
+
+pause_button = Button(
+    screen,  
+    900,  # X-coordinate of top left corner
+    320,  # Y-coordinate of top left corner 
+    95,  # Width
+    50,  # Height
+
+    text="ON",  
+    font=pygame.font.SysFont("Arial", 24, bold=True),
+    margin=10,  
+    textColour=(255, 255, 255), 
+    inactiveColour=(40, 167, 69), 
+    hoverColour=(33, 136, 56),  
+    pressedColour=(30, 126, 52),  
+    radius=10, 
+    onClick=toggle_simulation 
 )
 
-pause_btn_custom = Button(
-    image=pause_button_image,
-    x_pos=900 + 95 // 2, 
-    y_pos=320 + 50 // 2, 
-    text_input="ON", 
-    initial_text_color=pygame.Color('#FFFFFF'), 
-    hover_text_color=pygame.Color('#F0F0F0')    
+brush_slider = Slider(
+    screen, 
+    900, 100, # X, Y position
+    200, 30, # Width, Height
+    min=0, max=6, step=1, 
+    initial=spawn_radius,
+    
+    colour=(40, 44, 52),  
+    barColour=(30, 144, 255), 
+    handleColour=(173, 216, 230), 
 )
 
-
-material_display_label = pygame_gui.elements.UILabel(
-    relative_rect=pygame.Rect((900, 260), (200, 30)),
-    text=f"Current: {material_names[current_material-1]}",
-    manager=manager
+brush_size_label = TextBox(
+    screen, 
+    940, 140, # X, Y position
+    110, 30, # Width, Height 
+    font=pygame.font.SysFont("Arial", 18), 
+    textColour=(255, 255, 255), 
+    borderThickness=0, 
+    colour=(35, 38, 45), 
+    radius=5, 
+    maxInput=None 
 )
+brush_size_label.setText(f"Brush Size: {spawn_radius}") 
+brush_size_label.disable() 
 
 
 # Colors
@@ -139,10 +163,9 @@ SAND_COLORS = [
     (178, 153, 110),
 ]
 WATER_COLORS = [
-    (80, 140, 200),
-    (40, 100, 160), 
-    (10, 70, 130),  
-    (0, 40, 90)   
+    (65, 105, 225),   
+    (0, 0, 128),     
+    (25, 25, 112)
 ]
 
 EMPTY_COLOR = (0, 0, 0)
@@ -277,8 +300,8 @@ def update_particles():
                             active_particles_copy.add(water_particle)
                             active_particles.add(water_particle)
                         particles_to_draw.add(water_particle) 
-                        p.vx *= 0.5
-                        p.vy *= 0.5
+                        p.vx *= 0.6
+                        p.vy *= 0.6
                                         
                     if collision:
                         p.tx, p.ty = p.x, p.y
@@ -387,34 +410,13 @@ def get_line(x0, y0, x1, y1):
 prev_pos = None
 running = True
 while running:
-    time_delta = clock.tick(60) / 1000
     mouse_pos = pygame.mouse.get_pos()
-    for event in pygame.event.get():
+    events = pygame.event.get()
+    for event in events:
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.USEREVENT:
-            if event.user_type == pygame_gui.UI_HORIZONTAL_SLIDER_MOVED and event.ui_element == brush_slider:
-                spawn_radius = int(event.value)
-                brush_label.set_text(f"Brush Size: {spawn_radius}")
-        manager.process_events(event)
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1: # Left mouse button click
-                if sand_btn_custom.checkForInput(mouse_pos):
-                    current_material = SAND_ID
-                elif water_btn_custom.checkForInput(mouse_pos):
-                    current_material = WATER_ID
-                elif pause_btn_custom.checkForInput(mouse_pos):
-                    simulation_is_on = not simulation_is_on # Toggle pause state
-                    if simulation_is_on:
-                        pause_btn_custom.set_text("ON", pygame.Color('#FFFFFF')) # White text for ON
-                        pause_button_image.fill(pygame.Color('#28A745')) # Green background for ON
-                    else:
-                        pause_btn_custom.set_text("OFF", pygame.Color('#FFFFFF')) # White text for OFF
-                        pause_button_image.fill(pygame.Color('#DC3545')) # Red background for OFF
-                
-                # Update material display label (pygame_gui element)
-                material_display_label.set_text(f"Current: {material_names[current_material-1]}")
-    manager.update(time_delta)
+            pass
     # Mouse actions
     mouse_buttons = pygame.mouse.get_pressed()
     if any(mouse_buttons):
@@ -473,8 +475,6 @@ while running:
                                             particles_to_draw.discard(p)
 
         prev_pos = (gx, gy)
-    else:
-        prev_pos = None
     
     if simulation_is_on:
         update_particles()
@@ -483,15 +483,9 @@ while running:
     particles_to_draw.clear()
     pygame.draw.rect(screen, (30, 30, 30), (WINDOW_WIDTH -
                      TOOLBAR_WIDTH, 0, TOOLBAR_WIDTH, WINDOW_HEIGHT))
-    manager.draw_ui(screen)
-    sand_btn_custom.changeColor(mouse_pos) 
-    sand_btn_custom.update() 
-    
-    water_btn_custom.changeColor(mouse_pos) 
-    water_btn_custom.update()
-
-    pause_btn_custom.changeColor(mouse_pos)
-    pause_btn_custom.update() 
+    pygame_widgets.update(events)
+    spawn_radius =  brush_slider.getValue()
+    brush_size_label.setText(f"Brush Size: {spawn_radius}")
     pygame.display.flip()
     clock.tick(60)  
 

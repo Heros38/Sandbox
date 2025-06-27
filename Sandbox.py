@@ -9,7 +9,7 @@ import os
 
 
 # ------------------------Settings-------------------------------
-CELL_SIZE = 20
+CELL_SIZE = 8
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -23,6 +23,7 @@ random_velocity = False
 random_spawn = 0.75
 SAND_ID = 1
 WATER_ID = 2
+STONE_ID = 3
 current_material = SAND_ID # Start with sand
 simulation_is_on = True
 
@@ -46,6 +47,11 @@ def set_water_material():
     current_material = WATER_ID
     material_label.setText("Current: Water")
 
+def set_stone_material():
+    global current_material
+    current_material = STONE_ID
+    material_label.setText("Current: Stone")
+
 def  toggle_simulation():
     global simulation_is_on
     simulation_is_on = not simulation_is_on
@@ -62,7 +68,7 @@ def  toggle_simulation():
 
 sand_button = Button(
     screen,  
-    900,  # X-coordinate of top left corner 
+    850,  # X-coordinate of top left corner 
     200,  # Y-coordinate of top left corner 
     95,  # Width 
     50,  # Height 
@@ -80,7 +86,7 @@ sand_button = Button(
 
 water_button = Button(
     screen,  
-    1005,  # X-coordinate of top left corner 
+    955,  # X-coordinate of top left corner 
     200,  # Y-coordinate of top left corner
     95,  # Width
     50,  # Height
@@ -94,6 +100,24 @@ water_button = Button(
     pressedColour=(0, 64, 133),  
     radius=10,  
     onClick=set_water_material  
+)
+
+stone_button = Button(
+    screen,  
+    1060,  # X-coordinate of top left corner 
+    200,  # Y-coordinate of top left corner 
+    95,  # Width 
+    50,  # Height 
+
+    text="Stone",  
+    font=pygame.font.SysFont("Arial", 24, bold=True), 
+    margin=10,  
+    textColour=(255, 255, 255), 
+    inactiveColour=(100, 100, 100), 
+    hoverColour=(120, 120, 120), 
+    pressedColour=(80, 80, 80),
+    radius=10,  
+    onClick=set_stone_material  
 )
 
 material_label = TextBox(
@@ -168,6 +192,13 @@ WATER_COLORS = [
     (25, 25, 112)
 ]
 
+STONE_COLORS = [
+    (190, 200, 205),  
+    (140, 150, 155),  
+    (90, 100, 105),  
+    (50, 55, 60)      
+]
+
 EMPTY_COLOR = (0, 0, 0)
 
 
@@ -214,7 +245,7 @@ def update_near_particles(x, y):
                 continue
             p = grid[uy][ux]
             if p is not None:
-                if p not in active_particles:
+                if p not in active_particles and p.type in [SAND_ID, WATER_ID]:
                     active_particles_copy.add(p)
                     active_particles.add(p)
     for ux in [-1, 1]:
@@ -318,12 +349,16 @@ def update_particles():
                         nx = p.x + dx
                         ny = p.y + 1
                         if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT:
+                            if grid[p.y][nx] != None and grid[ny][p.x] != None:
+                                if grid[p.y][nx].type == STONE_ID and grid[ny][p.x].type == STONE_ID:
+                                    continue
                             if grid[ny][nx] is None:
                                 grid[previous_y][previous_x] = None
                                 p.x, p.y = nx, ny
                                 p.tx, p.ty = p.x, p.y
                                 moved = True
                                 break
+
                             elif p.type == SAND_ID and grid[ny][nx].type == WATER_ID:
                                 water_particle = grid[ny][nx] 
                                 grid[p.y][p.x] = None
@@ -444,6 +479,7 @@ while running:
                                                 grid[ny][nx] = p
                                                 active_particles.add(p)
                                                 particles_to_draw.add(p)
+                        
                         elif current_material == WATER_ID:
                             for dx in range(-spawn_radius, spawn_radius+1):
                                 for dy in range(-spawn_radius, spawn_radius+1):
@@ -459,22 +495,35 @@ while running:
                                                 grid[ny][nx] = p
                                                 active_particles.add(p)
                                                 particles_to_draw.add(p)
+                        
+                        elif current_material == STONE_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                                        if grid[ny][nx] is None:
+                                            p = Particle(STONE_ID, nx, ny, random.choice(STONE_COLORS))
+                                            grid[ny][nx] = p
+                                            particles_to_draw.add(p)
+
 
                     elif mouse_buttons[2]:  # Right click // Air
                         for dx in range(-spawn_radius, spawn_radius+1):
                             for dy in range(-spawn_radius, spawn_radius+1):
                                 nx, ny = x + dx, y + dy
                                 if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
-                                    if random_spawn >= random.random():
-                                        p = grid[ny][nx]
-                                        if p is not None:
-                                            active_particles.discard(p)
-                                            grid[ny][nx] = None
-                                            update_near_particles(nx, ny)
-                                            particles_to_clear.add((nx, ny))
-                                            particles_to_draw.discard(p)
+                                    p = grid[ny][nx]
+                                    if p is not None:
+                                        active_particles.discard(p)
+                                        grid[ny][nx] = None
+                                        update_near_particles(nx, ny)
+                                        particles_to_clear.add((nx, ny))
+                                        particles_to_draw.discard(p)
 
         prev_pos = (gx, gy)
+    else:
+        pass
+        prev_pos = None
     
     if simulation_is_on:
         update_particles()

@@ -129,7 +129,6 @@ while running:
 
         prev_pos = (gx, gy)
     else:
-        pass
         prev_pos = None
     
     if config.simulation_is_on:

@@ -14,6 +14,9 @@ pygame.display.set_caption("Sandbox")
 clock = pygame.time.Clock()
 ui_elements.init_ui(screen)
 
+CHROMATIC_PALETTE = utils.generate_palette(config.CHROMATIC_COLORS)
+palette_size = len(CHROMATIC_PALETTE)
+
 def set_sand_material_callback():
     config.current_material = config.SAND_ID
     ui_elements.update_material_label_text(f"Current: Sand")
@@ -26,6 +29,10 @@ def set_stone_material_callback():
     config.current_material = config.STONE_ID
     ui_elements.update_material_label_text(f"Current: Stone")
 
+def set_chromatic_material_callback():
+    config.current_material = config.CHROMATIC_ID
+    ui_elements.update_material_label_text(f"Current: Chromatic")
+
 def toggle_simulation_callback():
     config.simulation_is_on = not config.simulation_is_on
     if config.simulation_is_on:
@@ -36,7 +43,7 @@ def toggle_simulation_callback():
     else:
         ui_elements.pause_button.setText("OFF")
         ui_elements.pause_button.inactiveColour = (220, 53, 69) 
-        ui_elements.pause_button.hoverColour = (200, 48, 60)
+        ui_elements.pause_button.hoverColour = (200, 48, 60)    
         ui_elements.pause_button.pressedColour = (180, 40, 50)
 
 def update_brush_size_from_slider_callback(value):
@@ -47,7 +54,9 @@ def update_brush_size_from_slider_callback(value):
 ui_elements.sand_button.onClick = set_sand_material_callback
 ui_elements.water_button.onClick = set_water_material_callback
 ui_elements.stone_button.onClick = set_stone_material_callback
+ui_elements.chromatic_button.onClick = set_chromatic_material_callback
 ui_elements.pause_button.onClick = toggle_simulation_callback
+
 
 prev_pos = None
 running = True
@@ -94,7 +103,7 @@ while running:
                                     if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
                                         if config.RANDOM_SPAWN_PROBABILITY >= random.random():
                                             if particle_system.grid[ny][nx] is None:
-                                                p = particle_system.Particle(
+                                                p = particle_system.Particle(   
                                                     config.WATER_ID, nx, ny, random.choice(config.WATER_COLORS))
                                                 if config.random_velocity:
                                                     p.vx = vx
@@ -113,6 +122,16 @@ while running:
                                             particle_system.grid[ny][nx] = p
                                             particle_system.particles_to_draw.add(p)
 
+                        elif config.current_material == config.CHROMATIC_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
+                                        if particle_system.grid[ny][nx] is None:
+                                            p = particle_system.Particle(config.CHROMATIC_ID, nx, ny, random.choice(config.CHROMATIC_COLORS))
+                                            particle_system.grid[ny][nx] = p
+                                            particle_system.chromatic_particles.add(p)
+                                            
 
                     elif mouse_buttons[2]:  # Right click // Air
                         for dx in range(-spawn_radius, spawn_radius+1):
@@ -126,6 +145,7 @@ while running:
                                         particle_system.update_near_particles(nx, ny)
                                         particle_system.particles_to_clear.add((nx, ny))
                                         particle_system.particles_to_draw.discard(p)
+                                        particle_system.chromatic_particles.discard(p)
 
         prev_pos = (gx, gy)
     else:
@@ -139,10 +159,12 @@ while running:
     pygame.draw.rect(screen, (30, 30, 30), (config.WINDOW_WIDTH -
                     config.TOOLBAR_WIDTH, 0, config.TOOLBAR_WIDTH, config.WINDOW_HEIGHT))
     ui_elements.pygame_widgets.update(events)
+    if config.frame_count % 2 == 0:
+        particle_system.cycle_colors(CHROMATIC_PALETTE, palette_size) 
     if ui_elements.brush_slider != None:
         spawn_radius =  ui_elements.brush_slider.getValue()
         ui_elements.brush_size_label.setText(f"Brush Size: {spawn_radius}")
     pygame.display.flip()
     clock.tick(60)  
-
+    config.frame_count += 1
 pygame.quit()

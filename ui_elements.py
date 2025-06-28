@@ -10,21 +10,20 @@ brush_size_label = None
 sand_button = None
 water_button = None
 stone_button = None
+chromatic_button = None
 material_display_label = None
 pause_button = None
 
 def update_brush_label_text(text):
-    if brush_size_label: # Ensure the widget is initialized before trying to use it
+    if brush_size_label: 
         brush_size_label.setText(text)
-        brush_size_label.update() # Force TextBox to re-render its internal surface
 
 def update_material_label_text(text):
-    if material_display_label: # Ensure the widget is initialized
+    if material_display_label: 
         material_display_label.setText(text)
-        material_display_label.update()
 
 def init_ui(target_screen):
-    global brush_slider, brush_size_label, sand_button, water_button, stone_button, material_label, pause_button
+    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, material_display_label, pause_button
     sand_button = Button(
         target_screen,  
         850,  # X-coordinate of top left corner 
@@ -76,10 +75,26 @@ def init_ui(target_screen):
         radius=10,  
     )
 
-    material_label = TextBox(
+    chromatic_button = Button(
+            target_screen,
+            955,  # X-coordinate
+            260,  # Y-coordinate
+            95,   # Width
+            50,   # Height
+            text="Chromatic",
+            font=pygame.font.SysFont("Arial", 24, bold=True),
+            margin=10,
+            textColour=(255, 255, 255),
+            inactiveColour=(148, 0, 211),
+            hoverColour=(120, 0, 180),
+            pressedColour=(100, 0, 150),
+            radius=10,
+    )
+
+    material_display_label = TextBox(
         target_screen, 
-        940, 260, # X, Y 
-        120, 30, # Width, Height 
+        900, 320, # X, Y 
+        200, 30, # Width, Height 
         font=pygame.font.SysFont("Arial", 18),
         textColour=(255, 255, 255),
         borderThickness=0, 
@@ -87,13 +102,13 @@ def init_ui(target_screen):
         radius=5, 
         maxInput=None 
     )
-    material_label.setText(f"Current: Sand") 
-    material_label.disable() 
+    material_display_label.setText(f"Current: Sand") 
+    material_display_label.disable() 
 
     pause_button = Button(
         target_screen,  
         900,  # X-coordinate of top left corner
-        320,  # Y-coordinate of top left corner 
+        360,  # Y-coordinate of top left corner 
         95,  # Width
         50,  # Height
 

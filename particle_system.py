@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import time
 from config import *
 from utils import *
 
@@ -24,6 +25,7 @@ active_particles = set()
 active_particles_copy = set()
 particles_to_clear = set()
 particles_to_draw = set()
+chromatic_particles = set()
 
 
 #grid_surface = pygame.Surface((GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE)).convert()
@@ -64,6 +66,17 @@ def update_near_particles(x, y):
                 if p not in active_particles:
                     active_particles_copy.add(p)
                     active_particles.add(p)
+
+def cycle_colors(CHROMATIC_PALETTE, palette_size):
+    for p in chromatic_particles:
+        speed_factor = 50
+        spatial_factor = 2
+        index = int(time.time() * speed_factor + p.x * spatial_factor + p.y * spatial_factor) % palette_size
+        new_color = CHROMATIC_PALETTE[index]
+        if p.color != new_color:
+            p.color = new_color
+            particles_to_draw.add(p)
+
 
 def update_particles():
     global grid, active_particles, active_particles_copy, particles_to_clear, particles_to_draw
@@ -158,7 +171,7 @@ def update_particles():
                         ny = p.y + 1
                         if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT:
                             if grid[p.y][nx] != None and grid[ny][p.x] != None:
-                                if grid[p.y][nx].type == STONE_ID and grid[ny][p.x].type == STONE_ID:
+                                if (grid[p.y][nx].type == STONE_ID and grid[ny][p.x].type == STONE_ID) or (grid[p.y][nx].type == CHROMATIC_ID and grid[ny][p.x].type == CHROMATIC_ID):
                                     continue
                             if grid[ny][nx] is None:
                                 grid[previous_y][previous_x] = None

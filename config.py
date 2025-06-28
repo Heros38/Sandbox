@@ -1,6 +1,6 @@
 import pygame
 
-CELL_SIZE = 8
+CELL_SIZE = 10
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -15,8 +15,10 @@ RANDOM_SPAWN_PROBABILITY = 0.75
 SAND_ID = 1
 WATER_ID = 2
 STONE_ID = 3
+CHROMATIC_ID = 4 
 current_material = SAND_ID # Start with sand
 simulation_is_on = True
+frame_count = 0
 
 SAND_COLORS = [
     (210, 180, 140),
@@ -35,6 +37,15 @@ STONE_COLORS = [
     (140, 150, 155),  
     (90, 100, 105),  
     (50, 55, 60)      
+]
+CHROMATIC_COLORS = [
+    (255, 0, 0), 
+    (255, 127, 0), 
+    (255, 255, 0), 
+    (0, 255, 0),
+    (0, 0, 255), 
+    (75, 0, 130), 
+    (148, 0, 211)
 ]
 
 EMPTY_COLOR = (0, 0, 0)

@@ -46,6 +46,17 @@ def toggle_simulation_callback():
         ui_elements.pause_button.hoverColour = (200, 48, 60)    
         ui_elements.pause_button.pressedColour = (180, 40, 50)
 
+def clear_screen():
+    screen.fill(config.EMPTY_COLOR)
+    particle_system.active_particles.clear()
+    particle_system.particles_to_clear.clear()
+    particle_system.particles_to_draw.clear()
+    particle_system.chromatic_particles.clear()
+    for y in range(config.GRID_HEIGHT):
+        for x in range(config.GRID_WIDTH):
+            particle_system.grid[y][x] = None
+    
+
 def update_brush_size_from_slider_callback(value):
     config.spawn_radius = int(value) 
     ui_elements.update_brush_label_text(f"Brush Size: {config.spawn_radius}")
@@ -56,7 +67,7 @@ ui_elements.water_button.onClick = set_water_material_callback
 ui_elements.stone_button.onClick = set_stone_material_callback
 ui_elements.chromatic_button.onClick = set_chromatic_material_callback
 ui_elements.pause_button.onClick = toggle_simulation_callback
-
+ui_elements.clear_button.onClick = clear_screen
 
 prev_pos = None
 running = True

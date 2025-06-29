@@ -13,6 +13,7 @@ stone_button = None
 chromatic_button = None
 material_display_label = None
 pause_button = None
+clear_button = None
 
 def update_brush_label_text(text):
     if brush_size_label: 
@@ -23,7 +24,7 @@ def update_material_label_text(text):
         material_display_label.setText(text)
 
 def init_ui(target_screen):
-    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, material_display_label, pause_button
+    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, material_display_label, pause_button, clear_button
     sand_button = Button(
         target_screen,  
         850,  # X-coordinate of top left corner 
@@ -119,6 +120,23 @@ def init_ui(target_screen):
         inactiveColour=(40, 167, 69), 
         hoverColour=(33, 136, 56),  
         pressedColour=(30, 126, 52),  
+        radius=10, 
+    )
+
+    clear_button = Button(
+        target_screen,  
+        1005,  # X-coordinate of top left corner
+        360,  # Y-coordinate of top left corner 
+        95,  # Width
+        50,  # Height
+
+        text="Clear",  
+        font=pygame.font.SysFont("Arial", 24, bold=True),
+        margin=10,  
+        textColour=(255, 255, 255), 
+        inactiveColour=(220, 53, 69), 
+        hoverColour=(200, 48, 60),  
+        pressedColour=(180, 40, 50),  
         radius=10, 
     )
 

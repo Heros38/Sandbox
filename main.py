@@ -20,8 +20,8 @@ palette_size = len(CHROMATIC_PALETTE)
 
 def fps_counter():
     fps = str(int(clock.get_fps()))
-    fps_t = pygame.font.SysFont("Arial", 24, bold=True).render(
-        f'fps: {fps}', 1, pygame.Color("RED"))
+    fps_font = pygame.font.SysFont("Arial", 24, bold=True)
+    fps_t = fps_font.render(f'fps: {fps}', 1, pygame.Color("RED"))
     screen.blit(fps_t, (810, 565))
 
 

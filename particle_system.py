@@ -27,11 +27,6 @@ particles_to_clear = set()
 particles_to_draw = set()
 chromatic_particles = set()
 
-
-#grid_surface = pygame.Surface((GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE)).convert()
-#grid_surface.fill(EMPTY_COLOR)
-
-
 def initialize_grid():
     global grid, grid_surface
     grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
@@ -39,14 +34,13 @@ def initialize_grid():
     grid_surface.fill(EMPTY_COLOR)
 
 def draw_grid(target_screen):
+    global grid_surface
     for (x, y) in particles_to_clear:
-        pygame.draw.rect(target_screen, EMPTY_COLOR, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        pygame.draw.rect(grid_surface, EMPTY_COLOR, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
     for p in particles_to_draw:
-        pygame.draw.rect(target_screen, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
-
-    target_screen.blit(target_screen, (0, 0))
-
+        pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+    target_screen.blit(grid_surface, (0, 0))
 
 def update_near_particles(x, y):
     uy = y-1
@@ -202,27 +196,48 @@ def update_particles():
 
                 
                 if not moved and p.type == WATER_ID: #move randomly to the sides
-                    for dx in random.sample([-4, -1, 1, 4], 4):
-                        if dx < 0:
-                            path = [p.x - i for i in range(1, abs(dx)+ 1)]
-                        else:
-                            path = [p.x + i for i in range(1, dx + 1)]
-                        last_valid = (p.x, p.y)
+                    spread_distances = [1, 2, 3, 4]
+                    left_first = random.choice([True, False])
+                    directions_to_try = []
+                    if left_first:
+                        directions_to_try.append((-1, True))  # Left
+                        directions_to_try.append((1, False)) # Right
+                    else:
+                        directions_to_try.append((1, False)) # Right
+                        directions_to_try.append((-1, True))  # Left
 
-                        for nx in path:
-                            if not 0 <= nx < GRID_WIDTH:
-                                break
-                            if grid[p.y][nx] is None:
-                                last_valid = (nx, p.y)
-                            else:
-                                break
+                    found_spread_position = False
+                    new_x = p.x 
 
-                        if last_valid != (previous_x, previous_y):
-                            grid[previous_y][previous_x] = None
-                            p.x, p.y = last_valid
-                            p.tx, p.ty = p.x, p.y
-                            moved = True
+                    for direction_offset, is_left_dir in directions_to_try:
+                        if found_spread_position:
                             break
+
+                        furthest_x_in_this_direction = p.x 
+                        
+                        for dist in spread_distances:
+                            check_x = p.x + (direction_offset * dist)
+
+                            if not (0 <= check_x < GRID_WIDTH):
+                                break 
+
+                            if grid[previous_y][check_x] is None:
+                                furthest_x_in_this_direction = check_x 
+                            else:
+                                break 
+
+                        if furthest_x_in_this_direction != p.x:
+                            new_x = furthest_x_in_this_direction
+                            found_spread_position = True
+                            break 
+
+                    if found_spread_position:
+                        grid[previous_y][previous_x] = None
+                        p.x = new_x
+                        p.y = previous_y 
+                        p.tx = p.x
+                        p.ty = p.y
+                        moved = True
 
 
                 # Update grid

@@ -1,5 +1,9 @@
-#import math
+# import math
+from numba import jit
+import numpy as np
 
+
+@jit(nopython=True)
 def get_line(x0, y0, x1, y1):
     points = []
     dx = abs(x1 - x0)
@@ -21,6 +25,7 @@ def get_line(x0, y0, x1, y1):
             y0 += sy
     return points
 
+
 def lerp_color(color1, color2, t):
     r1, g1, b1 = color1
     r2, g2, b2 = color2
@@ -28,6 +33,7 @@ def lerp_color(color1, color2, t):
     g = g1 + (g2 - g1) * t
     b = b1 + (b2 - b1) * t
     return (int(r), int(g), int(b))
+
 
 def generate_palette(colors_table, steps=60):
     palette = []
@@ -38,3 +44,14 @@ def generate_palette(colors_table, steps=60):
             new_color = lerp_color(colors[i], colors[i+1], t)
             palette.append(new_color)
     return palette
+
+
+@jit(nopython=True)
+def get_shuffled_tab(tab):
+    directions = np.array(tab, dtype=np.int32)
+    np.random.shuffle(directions)
+    return directions
+
+
+get_line(0, 0, 0, 0)
+get_shuffled_tab([1, 2])

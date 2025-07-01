@@ -106,9 +106,9 @@ def init_ui(target_screen):
         font=pygame.font.SysFont("Arial", 24, bold=True),
         margin=10,
         textColour=(255, 255, 255),
-        inactiveColour=(148, 0, 211),
-        hoverColour=(120, 0, 180),
-        pressedColour=(100, 0, 150),
+        inactiveColour=(210, 215, 220),
+        hoverColour=(180, 185, 190),
+        pressedColour=(150, 155, 160),
         radius=10,
     )
 

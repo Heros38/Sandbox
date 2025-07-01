@@ -69,7 +69,7 @@ def clear_screen():
     particle_system.particles_to_clear.clear()
     particle_system.particles_to_draw.clear()
     particle_system.chromatic_particles.clear()
-    particle_system.steam_particles.clear()
+    particle_system.active_steam_particles.clear()
     particle_system.initialize_grid()
 
 
@@ -178,7 +178,7 @@ while running:
                                                 p = particle_system.Particle(
                                                     config.STEAM_ID, nx, ny, random.choice(config.STEAM_COLORS))
                                                 particle_system.grid[ny][nx] = p
-                                                particle_system.steam_particles.add(
+                                                particle_system.active_steam_particles.add(
                                                     p)
                                                 particle_system.particles_to_draw.add(
                                                     p)
@@ -201,7 +201,7 @@ while running:
                                             p)
                                         particle_system.chromatic_particles.discard(
                                             p)
-                                        particle_system.steam_particles.discard(
+                                        particle_system.active_steam_particles.discard(
                                             p)
         prev_pos = (gx, gy)
     else:

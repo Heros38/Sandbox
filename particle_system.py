@@ -30,7 +30,7 @@ active_particles_copy = set()
 particles_to_clear = set()
 particles_to_draw = set()
 chromatic_particles = set()
-steam_particles = set()
+active_steam_particles = set()
 
 
 def initialize_grid():
@@ -56,7 +56,7 @@ def draw_grid(target_screen):
 def update_near_particles(x: int, y: int):
     ny = y - 1
     if 0 <= ny < GRID_HEIGHT:
-        for dx in [-1, 0, 1]:
+        for dx in [-1, 0, 1]:  # normal falling blocks
             nx = x + dx
             if 0 <= nx < GRID_WIDTH:
                 p = grid[ny][nx]
@@ -65,7 +65,7 @@ def update_near_particles(x: int, y: int):
                         if p not in active_particles:
                             active_particles.add(p)
                             active_particles_copy.add(p)
-    for dx in [-1, 1]:
+    for dx in [-1, 1]:  # water because it can spread sideways (also steam)
         nx = x + dx
         if 0 <= nx < GRID_WIDTH:
             p = grid[y][nx]
@@ -74,6 +74,17 @@ def update_near_particles(x: int, y: int):
                     if p not in active_particles:
                         active_particles.add(p)
                         active_particles_copy.add(p)
+                elif p.type == STEAM_ID:
+                    active_steam_particles.add(p)
+    ny = y + 1
+    if 0 <= ny < GRID_HEIGHT:
+        for dx in [-1, 0, 1]:  # elements that go upwards like steam
+            nx = x + dx
+            if 0 <= nx < GRID_WIDTH:
+                p = grid[ny][nx]
+                if p is not None:
+                    if p.type == STEAM_ID:
+                        active_steam_particles.add(p)
 
 
 def cycle_colors(CHROMATIC_PALETTE: list, palette_size: int):
@@ -107,28 +118,66 @@ apply_gravity(2, 3, 4, 5, 1)
 
 
 def update_steam_particles():
-    for p in steam_particles:
-        particles_to_clear.add((p.x, p.y))
-        grid[p.y][p.x] = None
+    active_steam_particles_copy = active_steam_particles.copy()
+    for p in active_steam_particles_copy:
+        previous_x, previous_y = p.x, p.y
         moved = False
-        if p.y - 1 >= 0:
-            for nx in random.sample([-1, 0, 1], 3):
-                if 0 <= p.x + nx < GRID_WIDTH:
-                    if grid[p.y-1][p.x + nx] == None and not (grid[p.y-1][p.x] != None and grid[p.y][p.x + nx] != None):
-                        p.x += nx
-                        p.y -= 1
+        condensed = False
+        top = False
+        ny = previous_y - 1
+        if ny >= 0:
+            for dx in random.sample([-1, 0, 1], 3):
+                nx = previous_x + dx
+                if 0 <= nx < GRID_WIDTH:
+                    if grid[ny][nx] == None and not (grid[ny][previous_x] != None and grid[previous_y][nx] != None):
+                        p.x = nx
+                        p.y = ny
                         p.tx, p.ty = p.x, p.y
                         moved = True
                         break
         if not moved:
-            for nx in random.sample([-1, 1], 2):
-                if 0 <= p.x + nx < GRID_WIDTH:
-                    if grid[p.y][p.x + nx] == None:
-                        p.x += nx
-                        p.tx = p.x
+            top = True
+            if ny >= 0:
+                for dx in range(-1, 0, 1):
+                    if grid[ny][p.x + dx] is not None and grid[ny][p.x + dx].type not in [STONE_ID, CHROMATIC_ID]:
+                        top = False
                         break
-        particles_to_draw.add(p)
-        grid[p.y][p.x] = p
+
+        if top:
+            r = random.random()
+            if r <= CONDENSE_PROBABILITY:  # steam condenses into water
+                grid[previous_y][previous_x] = None
+                water_particle = Particle(
+                    WATER_ID, previous_x, previous_y, random.choice(WATER_COLORS))
+                grid[previous_y][previous_x] = water_particle
+                particles_to_draw.add(water_particle)
+                active_particles.add(water_particle)
+                active_steam_particles.discard(p)
+                continue
+            elif r <= STEAM_TO_WATER_RATIO * CONDENSE_PROBABILITY:  # the steam dissapear
+                grid[previous_y][previous_x] = None
+                particles_to_clear.add((previous_x, previous_y))
+                active_steam_particles.discard(p)
+                continue
+
+        elif not moved:
+            for dx in random.sample([-1, 1], 2):
+                nx = previous_x + dx
+                if 0 <= nx < GRID_WIDTH:
+                    if grid[previous_y][nx] == None:
+                        p.x = nx
+                        p.tx = p.x
+                        moved = True
+                        break
+        if moved:
+            particles_to_clear.add((previous_x, previous_y))
+            grid[previous_y][previous_x] = None
+            particles_to_draw.add(p)
+            grid[p.y][p.x] = p
+            active_steam_particles.add(p)
+            update_near_particles(previous_x, previous_y)
+        elif not top:
+            active_steam_particles.discard(p)
 
 
 def _find_furthest_spread_x(original_x, current_y, dx_direction, grid, GRID_WIDTH, MAX_SPREAD_DIST):

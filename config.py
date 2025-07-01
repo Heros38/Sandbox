@@ -19,9 +19,11 @@ SAND_ID = 1
 WATER_ID = 2
 STONE_ID = 3
 CHROMATIC_ID = 4
+STEAM_ID = 5
 current_material = SAND_ID  # Start with sand
 simulation_is_on = True
 frame_count = 0
+MAX_SPREAD_DIST = 4
 
 SAND_COLORS = [
     (210, 180, 140),
@@ -49,6 +51,13 @@ CHROMATIC_COLORS = [
     (0, 0, 255),
     (75, 0, 130),
     (148, 0, 211)
+]
+
+STEAM_COLORS = [
+    (240, 240, 240),  # Almost White
+    (225, 225, 225),  # Very Light Gray
+    (210, 210, 210),  # Subtle Gray
+    (195, 195, 195)   # Faint Shadow Gray
 ]
 
 EMPTY_COLOR = (0, 0, 0)

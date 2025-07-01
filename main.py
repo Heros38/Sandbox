@@ -45,6 +45,11 @@ def set_chromatic_material_callback():
     ui_elements.update_material_label_text(f"Current: Chromatic")
 
 
+def set_steam_material_callback():
+    config.current_material = config.STEAM_ID
+    ui_elements.update_material_label_text(f"Current: Steam")
+
+
 def toggle_simulation_callback():
     config.simulation_is_on = not config.simulation_is_on
     if config.simulation_is_on:
@@ -60,14 +65,12 @@ def toggle_simulation_callback():
 
 
 def clear_screen():
-    screen.fill(config.EMPTY_COLOR)
     particle_system.active_particles.clear()
     particle_system.particles_to_clear.clear()
     particle_system.particles_to_draw.clear()
     particle_system.chromatic_particles.clear()
-    for y in range(config.GRID_HEIGHT):
-        for x in range(config.GRID_WIDTH):
-            particle_system.grid[y][x] = None
+    particle_system.steam_particles.clear()
+    particle_system.initialize_grid()
 
 
 def update_brush_size_from_slider_callback(value):
@@ -79,6 +82,7 @@ ui_elements.sand_button.onClick = set_sand_material_callback
 ui_elements.water_button.onClick = set_water_material_callback
 ui_elements.stone_button.onClick = set_stone_material_callback
 ui_elements.chromatic_button.onClick = set_chromatic_material_callback
+ui_elements.steam_button.onClick = set_steam_material_callback
 ui_elements.pause_button.onClick = toggle_simulation_callback
 ui_elements.clear_button.onClick = clear_screen
 
@@ -164,6 +168,21 @@ while running:
                                             particle_system.chromatic_particles.add(
                                                 p)
 
+                        elif config.current_material == config.STEAM_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
+                                        if config.RANDOM_SPAWN_PROBABILITY >= random.random():
+                                            if particle_system.grid[ny][nx] is None:
+                                                p = particle_system.Particle(
+                                                    config.STEAM_ID, nx, ny, random.choice(config.STEAM_COLORS))
+                                                particle_system.grid[ny][nx] = p
+                                                particle_system.steam_particles.add(
+                                                    p)
+                                                particle_system.particles_to_draw.add(
+                                                    p)
+
                     elif mouse_buttons[2]:  # Right click // Air
                         for dx in range(-spawn_radius, spawn_radius+1):
                             for dy in range(-spawn_radius, spawn_radius+1):
@@ -182,13 +201,15 @@ while running:
                                             p)
                                         particle_system.chromatic_particles.discard(
                                             p)
-
+                                        particle_system.steam_particles.discard(
+                                            p)
         prev_pos = (gx, gy)
     else:
         prev_pos = None
 
     if config.simulation_is_on:
         particle_system.update_particles()
+        particle_system.update_steam_particles()
     particle_system.draw_grid(screen)
     particle_system.particles_to_clear.clear()
     particle_system.particles_to_draw.clear()

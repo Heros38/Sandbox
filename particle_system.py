@@ -4,16 +4,20 @@ import math
 import time
 from config import *
 from utils import *
+from numba import jit
+
 
 class Particle:
+    __slots__ = ('type', 'x', 'y', 'tx', 'ty', 'vx', 'vy', 'color')
+
     def __init__(self, type, x, y, color):
         self.type = type
         self.x = x
         self.y = y
         self.tx = float(x)
         self.ty = float(y)
-        self.vx = 0
-        self.vy = 1
+        self.vx = 0.0
+        self.vy = 1.0
         self.color = color
 
     def __repr__(self):
@@ -26,50 +30,121 @@ active_particles_copy = set()
 particles_to_clear = set()
 particles_to_draw = set()
 chromatic_particles = set()
+steam_particles = set()
+
 
 def initialize_grid():
     global grid, grid_surface
     grid = [[None for _ in range(GRID_WIDTH)] for _ in range(GRID_HEIGHT)]
-    grid_surface = pygame.Surface((GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE)).convert()
+    grid_surface = pygame.Surface(
+        (GRID_WIDTH * CELL_SIZE, GRID_HEIGHT * CELL_SIZE)).convert()
     grid_surface.fill(EMPTY_COLOR)
+
 
 def draw_grid(target_screen):
     global grid_surface
     for (x, y) in particles_to_clear:
-        pygame.draw.rect(grid_surface, EMPTY_COLOR, (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        pygame.draw.rect(grid_surface, EMPTY_COLOR,
+                         (x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
 
     for p in particles_to_draw:
-        pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE, p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
+        pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE,
+                         p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
     target_screen.blit(grid_surface, (0, 0))
 
-def update_near_particles(x, y):
-    uy = y-1
-    if not (uy < 0 or uy >= GRID_HEIGHT):
-        for ux in range(x - 1, x + 2):
-            if ux < 0 or ux >= GRID_WIDTH:
-                continue
-            p = grid[uy][ux]
-            if p is not None:
-                if p not in active_particles and p.type in [SAND_ID, WATER_ID]:
-                    active_particles_copy.add(p)
-                    active_particles.add(p)
-    for ux in [-1, 1]:
-        if x + ux < GRID_WIDTH and x + ux > 0:
-            p = grid[y][x + ux]
-            if p is not None and p.type == WATER_ID:
-                if p not in active_particles:
-                    active_particles_copy.add(p)
-                    active_particles.add(p)
 
-def cycle_colors(CHROMATIC_PALETTE, palette_size):
+def update_near_particles(x: int, y: int):
+    ny = y - 1
+    if 0 <= ny < GRID_HEIGHT:
+        for dx in [-1, 0, 1]:
+            nx = x + dx
+            if 0 <= nx < GRID_WIDTH:
+                p = grid[ny][nx]
+                if p is not None:
+                    if p.type in (SAND_ID, WATER_ID):
+                        if p not in active_particles:
+                            active_particles.add(p)
+                            active_particles_copy.add(p)
+    for dx in [-1, 1]:
+        nx = x + dx
+        if 0 <= nx < GRID_WIDTH:
+            p = grid[y][nx]
+            if p is not None:
+                if p.type == WATER_ID:
+                    if p not in active_particles:
+                        active_particles.add(p)
+                        active_particles_copy.add(p)
+
+
+def cycle_colors(CHROMATIC_PALETTE: list, palette_size: int):
     for p in chromatic_particles:
         speed_factor = 50
         spatial_factor = 2
-        index = int(time.time() * speed_factor + p.x * spatial_factor + p.y * spatial_factor) % palette_size
+        index = int(time.time() * speed_factor + p.x *
+                    spatial_factor + p.y * spatial_factor) % palette_size
         new_color = CHROMATIC_PALETTE[index]
         if p.color != new_color:
             p.color = new_color
             particles_to_draw.add(p)
+
+
+@jit(nopython=True)
+def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
+    V2 = vx**2 + vy**2
+    if V2 > 0.0001:
+        V = math.sqrt(V2)
+        damping = 1 - FRICTION * V
+        vx *= damping
+        vy = gravity + damping * vy
+    else:
+        vy = gravity
+    target_tx = tx + vx
+    target_ty = ty + vy
+    return target_tx, target_ty, round(target_tx), round(target_ty), vx, vy
+
+
+apply_gravity(2, 3, 4, 5, 1)
+
+
+def update_steam_particles():
+    for p in steam_particles:
+        particles_to_clear.add((p.x, p.y))
+        grid[p.y][p.x] = None
+        moved = False
+        if p.y - 1 >= 0:
+            for nx in random.sample([-1, 0, 1], 3):
+                if 0 <= p.x + nx < GRID_WIDTH:
+                    if grid[p.y-1][p.x + nx] == None and not (grid[p.y-1][p.x] != None and grid[p.y][p.x + nx] != None):
+                        p.x += nx
+                        p.y -= 1
+                        p.tx, p.ty = p.x, p.y
+                        moved = True
+                        break
+        if not moved:
+            for nx in random.sample([-1, 1], 2):
+                if 0 <= p.x + nx < GRID_WIDTH:
+                    if grid[p.y][p.x + nx] == None:
+                        p.x += nx
+                        p.tx = p.x
+                        break
+        particles_to_draw.add(p)
+        grid[p.y][p.x] = p
+
+
+def _find_furthest_spread_x(original_x, current_y, dx_direction, grid, GRID_WIDTH, MAX_SPREAD_DIST):
+    furthest_x = original_x
+    for dist in range(1, MAX_SPREAD_DIST + 1):
+        check_x = original_x + (dx_direction * dist)
+
+        if check_x < 0 or check_x >= GRID_WIDTH:
+            break
+
+        if grid[current_y][check_x] is None:
+            furthest_x = check_x
+        else:
+            break  # Blocked
+
+    return furthest_x
 
 
 def update_particles():
@@ -83,34 +158,23 @@ def update_particles():
         active_particles_copy = set()
         for y in range(GRID_HEIGHT - 1, -1, -1):
             for p in buckets[y]:
-                #p.color = (200, 50, 50)
                 previous_x, previous_y = p.x, p.y
 
-                V2 = p.vx**2 + p.vy**2
-                if V2 > 0.0001:
-                    V = math.sqrt(V2)
-                    damping = 1 - FRICTION * V
-                    p.vx *= damping
-                    p.vy = GRAVITY + damping * p.vy
-                else:
-                    p.vy = GRAVITY
+                target_tx, target_ty, int_target_x, int_target_y, p.vx, p.vy = apply_gravity(
+                    p.vx, p.vy, p.tx, p.ty, GRAVITY)
 
                 moved = False
-                target_tx = p.tx + p.vx
-                target_ty = p.ty + p.vy
-
-                int_target_x = round(target_tx)
-                int_target_y = round(target_ty)
-
-                if abs(int_target_x - p.x) <= 1 and abs(int_target_y - p.y) <= 1:
-                    path = [(previous_x, previous_y), (int_target_x, int_target_y)]
+                if abs(int_target_x - previous_x) <= 1 and abs(int_target_y - previous_y) <= 1:
+                    path = [(previous_x, previous_y),
+                            (int_target_x, int_target_y)]
                 else:
-                    path = get_line(previous_x, previous_y, int_target_x, int_target_y)
-                
+                    path = get_line(previous_x, previous_y,
+                                    int_target_x, int_target_y)
+
                 last_empty = (previous_x, previous_y)
                 final_x, final_y = previous_x, previous_y
                 collision = False
-                
+
                 for nx, ny in path[1:]:
                     if not (0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT):
                         collision = True
@@ -118,15 +182,16 @@ def update_particles():
                     cell_content = grid[ny][nx]
 
                     if cell_content is None:
-                        final_x, final_y = nx, ny 
+                        final_x, final_y = nx, ny
                         last_empty = (nx, ny)
                         continue
 
-                    elif cell_content.type == WATER_ID and p.type == SAND_ID: # Sand encounters Water
-                        final_x, final_y = nx, ny 
+                    # swap between two particles
+                    elif (cell_content.type == WATER_ID and p.type == SAND_ID) or cell_content.type == STEAM_ID:
+                        final_x, final_y = nx, ny
                         break
 
-                    else: 
+                    else:
                         collision = True
                         break
 
@@ -134,21 +199,20 @@ def update_particles():
                     grid[previous_y][previous_x] = None
                     p.x, p.y = final_x, final_y
                     grid[p.y][p.x] = None
-                    
+
                     if cell_content is not None and p.type != WATER_ID and cell_content.type == WATER_ID:
-                        water_particle = cell_content
-                        water_particle.x = last_empty[0]
-                        water_particle.y = last_empty[1]
-                        water_particle.tx = water_particle.x
-                        water_particle.ty = water_particle.y
-                        grid[water_particle.y][water_particle.x] = water_particle
-                        if water_particle not in active_particles:
-                            active_particles_copy.add(water_particle)
-                            active_particles.add(water_particle)
-                        particles_to_draw.add(water_particle) 
+                        cell_content.x = last_empty[0]
+                        cell_content.y = last_empty[1]
+                        cell_content.tx = cell_content.x
+                        cell_content.ty = cell_content.y
+                        grid[cell_content.y][cell_content.x] = cell_content
+                        if cell_content not in active_particles:
+                            active_particles_copy.add(cell_content)
+                            active_particles.add(cell_content)
+                        particles_to_draw.add(cell_content)
                         p.vx *= 0.6
                         p.vy *= 0.6
-                                        
+
                     if collision:
                         p.tx, p.ty = p.x, p.y
                         p.vx *= 0.5
@@ -157,88 +221,78 @@ def update_particles():
                         p.tx = target_tx
                         p.ty = target_ty
                     moved = True
- 
+
                 if not moved:
                     # diagonals
                     for dx in random.sample([-1, 1], 2):
                         nx = p.x + dx
                         ny = p.y + 1
                         if 0 <= nx < GRID_WIDTH and ny < GRID_HEIGHT:
-                            if grid[p.y][nx] != None and grid[ny][p.x] != None:
-                                if (grid[p.y][nx].type == STONE_ID and grid[ny][p.x].type == STONE_ID) or (grid[p.y][nx].type == CHROMATIC_ID and grid[ny][p.x].type == CHROMATIC_ID):
+                            cell_content = grid[ny][nx]
+                            cell_adjacent = grid[p.y][nx]
+                            cell_under = grid[ny][p.x]
+                            if (cell_adjacent != None and cell_under != None):
+                                if cell_adjacent.type in [STONE_ID, CHROMATIC_ID] and cell_under.type in [STONE_ID, CHROMATIC_ID]:
                                     continue
-                            if grid[ny][nx] is None:
+                            if cell_content is None:
                                 grid[previous_y][previous_x] = None
                                 p.x, p.y = nx, ny
                                 p.tx, p.ty = p.x, p.y
                                 moved = True
                                 break
 
-                            elif p.type == SAND_ID and grid[ny][nx].type == WATER_ID:
-                                water_particle = grid[ny][nx] 
+                            elif (p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID:
                                 grid[p.y][p.x] = None
                                 grid[ny][nx] = None
-                                grid[previous_y][previous_x] = water_particle
-                                water_particle.x, water_particle.tx  = previous_x, previous_x
-                                water_particle.y, water_particle.ty = previous_y, previous_y
+                                grid[previous_y][previous_x] = cell_content
+                                cell_content.x, cell_content.tx = previous_x, previous_x
+                                cell_content.y, cell_content.ty = previous_y, previous_y
                                 p.x, p.y = nx, ny
 
                                 p.tx, p.ty = float(p.x), float(p.y)
-                                #p.vx *= 0.6 
-                                #p.vy *= 0.6  
-                                
-                                if water_particle not in active_particles:
-                                    active_particles_copy.add(water_particle)
-                                    active_particles.add(water_particle)
-                                particles_to_draw.add(water_particle)
+                                # p.vx *= 0.6
+                                # p.vy *= 0.6
+
+                                if cell_content not in active_particles and cell_content.type != STEAM_ID:
+                                    active_particles_copy.add(cell_content)
+                                    active_particles.add(cell_content)
+                                particles_to_draw.add(cell_content)
                                 moved = True
                                 break
 
-                
-                if not moved and p.type == WATER_ID: #move randomly to the sides
-                    spread_distances = [1, 2, 3, 4]
-                    left_first = random.choice([True, False])
-                    directions_to_try = []
-                    if left_first:
-                        directions_to_try.append((-1, True))  # Left
-                        directions_to_try.append((1, False)) # Right
+                if not moved and p.type == WATER_ID:
+                    current_x = p.x
+                    current_y = p.y
+
+                    direction1 = 1
+                    direction2 = -1
+                    if random.choice([True, False]):
+                        direction1 = -1
+                        direction2 = 1
+
+                    final_new_x = current_x
+                    moved_in_this_step = False
+
+                    calculated_new_x = _find_furthest_spread_x(
+                        current_x, current_y, direction1, grid, GRID_WIDTH, MAX_SPREAD_DIST)
+                    if calculated_new_x != current_x:
+                        final_new_x = calculated_new_x
+                        moved_in_this_step = True
                     else:
-                        directions_to_try.append((1, False)) # Right
-                        directions_to_try.append((-1, True))  # Left
+                        calculated_new_x = _find_furthest_spread_x(
+                            current_x, current_y, direction2, grid, GRID_WIDTH, MAX_SPREAD_DIST)
+                        if calculated_new_x != current_x:
+                            final_new_x = calculated_new_x
+                            moved_in_this_step = True
 
-                    found_spread_position = False
-                    new_x = p.x 
-
-                    for direction_offset, is_left_dir in directions_to_try:
-                        if found_spread_position:
-                            break
-
-                        furthest_x_in_this_direction = p.x 
-                        
-                        for dist in spread_distances:
-                            check_x = p.x + (direction_offset * dist)
-
-                            if not (0 <= check_x < GRID_WIDTH):
-                                break 
-
-                            if grid[previous_y][check_x] is None:
-                                furthest_x_in_this_direction = check_x 
-                            else:
-                                break 
-
-                        if furthest_x_in_this_direction != p.x:
-                            new_x = furthest_x_in_this_direction
-                            found_spread_position = True
-                            break 
-
-                    if found_spread_position:
+                    if moved_in_this_step:
                         grid[previous_y][previous_x] = None
-                        p.x = new_x
-                        p.y = previous_y 
+
+                        p.x = final_new_x
+                        p.y = current_y
                         p.tx = p.x
                         p.ty = p.y
                         moved = True
-
 
                 # Update grid
                 grid[p.y][p.x] = p
@@ -248,8 +302,6 @@ def update_particles():
                     particles_to_clear.add((previous_x, previous_y))
                     particles_to_draw.add(p)
                 else:
-                    #p.color = (50, 200, 50)
-                    #particles_to_draw.add(p)
                     active_particles.discard(p)
                     p.vx = 0
                     p.vy = 1

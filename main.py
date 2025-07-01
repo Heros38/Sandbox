@@ -16,6 +16,10 @@ ui_elements.init_ui(screen)
 
 CHROMATIC_PALETTE = utils.generate_palette(config.CHROMATIC_COLORS)
 palette_size = len(CHROMATIC_PALETTE)
+# warm-up for jit functions
+particle_system.apply_gravity(1.0, 1.0, 10.0, 10.0, 1.0)
+utils.get_line(0, 0, 0, 0)
+utils.get_shuffled_tab([1, 2])
 
 
 def fps_counter():

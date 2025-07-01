@@ -4,7 +4,7 @@ import numpy as np
 
 
 @jit(nopython=True)
-def get_line(x0, y0, x1, y1):
+def get_line(x0: int, y0: int, x1: int, y1: int):
     points = []
     dx = abs(x1 - x0)
     dy = -abs(y1 - y0)
@@ -26,7 +26,7 @@ def get_line(x0, y0, x1, y1):
     return points
 
 
-def lerp_color(color1, color2, t):
+def lerp_color(color1: tuple, color2: tuple, t: float):
     r1, g1, b1 = color1
     r2, g2, b2 = color2
     r = r1 + (r2 - r1) * t
@@ -35,7 +35,7 @@ def lerp_color(color1, color2, t):
     return (int(r), int(g), int(b))
 
 
-def generate_palette(colors_table, steps=60):
+def generate_palette(colors_table: list, steps=60):
     palette = []
     colors = colors_table + [colors_table[0]]
     for i in range(len(colors) - 1):
@@ -47,11 +47,7 @@ def generate_palette(colors_table, steps=60):
 
 
 @jit(nopython=True)
-def get_shuffled_tab(tab):
+def get_shuffled_tab(tab: list):
     directions = np.array(tab, dtype=np.int32)
     np.random.shuffle(directions)
     return directions
-
-
-get_line(0, 0, 0, 0)
-get_shuffled_tab([1, 2])

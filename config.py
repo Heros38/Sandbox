@@ -1,7 +1,7 @@
 import pygame
 import utils
 
-CELL_SIZE = 5
+CELL_SIZE = 10
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -14,8 +14,10 @@ FRICTION = 0.02
 spawn_radius = 0
 random_velocity = False
 RANDOM_SPAWN_PROBABILITY = 0.75
-CONDENSE_PROBABILITY = 0.01 # probability that the steam turns into water when at the top of the screen
-STEAM_TO_WATER_RATIO = 2 # how many steam particle is needed to make one water particle on average
+# probability that the steam turns into water when at the top of the screen
+CONDENSE_PROBABILITY = 0.01
+# how many steam particle is needed to make one water particle on average
+STEAM_TO_WATER_RATIO = 2
 EMPTY_ID = 0
 SAND_ID = 1
 WATER_ID = 2

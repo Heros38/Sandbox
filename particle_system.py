@@ -114,9 +114,6 @@ def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
     return target_tx, target_ty, round(target_tx), round(target_ty), vx, vy
 
 
-apply_gravity(2, 3, 4, 5, 1)
-
-
 def update_steam_particles():
     active_steam_particles_copy = active_steam_particles.copy()
     for p in active_steam_particles_copy:
@@ -158,6 +155,7 @@ def update_steam_particles():
                 grid[previous_y][previous_x] = None
                 particles_to_clear.add((previous_x, previous_y))
                 active_steam_particles.discard(p)
+                update_near_particles(previous_x, previous_y)
                 continue
 
         elif not moved:
@@ -210,7 +208,7 @@ def update_particles():
                 previous_x, previous_y = p.x, p.y
 
                 target_tx, target_ty, int_target_x, int_target_y, p.vx, p.vy = apply_gravity(
-                    p.vx, p.vy, p.tx, p.ty, GRAVITY)
+                    float(p.vx), float(p.vy), float(p.tx), float(p.ty), GRAVITY)
 
                 moved = False
                 if abs(int_target_x - previous_x) <= 1 and abs(int_target_y - previous_y) <= 1:
@@ -249,15 +247,17 @@ def update_particles():
                     p.x, p.y = final_x, final_y
                     grid[p.y][p.x] = None
 
-                    if cell_content is not None and p.type != WATER_ID and cell_content.type == WATER_ID:
+                    if cell_content is not None and ((p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID):
                         cell_content.x = last_empty[0]
                         cell_content.y = last_empty[1]
                         cell_content.tx = cell_content.x
                         cell_content.ty = cell_content.y
                         grid[cell_content.y][cell_content.x] = cell_content
-                        if cell_content not in active_particles:
+                        if cell_content.type == WATER_ID and cell_content not in active_particles:
                             active_particles_copy.add(cell_content)
                             active_particles.add(cell_content)
+                        elif cell_content.type == STEAM_ID:
+                            active_steam_particles.add(cell_content)
                         particles_to_draw.add(cell_content)
                         p.vx *= 0.6
                         p.vy *= 0.6

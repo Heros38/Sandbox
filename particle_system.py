@@ -31,6 +31,7 @@ particles_to_clear = set()
 particles_to_draw = set()
 chromatic_particles = set()
 active_steam_particles = set()
+fire_particles = set()
 
 
 def initialize_grid():
@@ -51,6 +52,8 @@ def draw_grid(target_screen):
         pygame.draw.rect(grid_surface, p.color, (p.x * CELL_SIZE,
                          p.y * CELL_SIZE, CELL_SIZE, CELL_SIZE))
     target_screen.blit(grid_surface, (0, 0))
+    particles_to_clear.clear()
+    particles_to_draw.clear()
 
 
 def update_near_particles(x: int, y: int):
@@ -114,29 +117,89 @@ def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
     return target_tx, target_ty, round(target_tx), round(target_ty), vx, vy
 
 
+def update_fire_particles():
+    fire_particles_copy = fire_particles.copy()
+    for p in fire_particles_copy:
+        previous_x, previous_y = p.x, p.y
+        if random.random() <= FIRE_DIES_PROBABILITY:
+            grid[previous_y][previous_x] = None
+            fire_particles.discard(p)
+            particles_to_clear.add((previous_x, previous_y))
+            particles_to_draw.discard(p)
+        else:
+            ny = previous_y - 1
+            if ny >= 0:
+                for dx in random.sample([-1, 0, 1], 3):
+                    nx = previous_x + dx
+                    if 0 <= nx < GRID_WIDTH:
+                        if grid[ny][nx] == None:  # fire just moves
+                            p.x = nx
+                            p.y = ny
+                            p.tx, p.ty = p.x, p.y
+                            grid[ny][nx] = p
+                            grid[previous_y][previous_x] = None
+                            particles_to_clear.add((previous_x, previous_y))
+                            particles_to_draw.add(p)
+                            break
+                        # fire encounters water -> create steam
+                        elif grid[ny][nx].type == WATER_ID:
+                            water_particle = grid[ny][nx]
+                            grid[ny][nx] = None
+                            grid[previous_y][previous_x] = None
+                            active_particles.discard(water_particle)
+                            fire_particles.discard(p)
+                            particles_to_clear.add((previous_x, previous_y))
+                            particles_to_clear.add((nx, ny))
+                            steam1 = Particle(STEAM_ID, nx, ny, random.choice(STEAM_COLORS))
+                            steam2 = Particle(STEAM_ID, previous_x, previous_y, random.choice(STEAM_COLORS))
+                            grid[ny][nx] = steam1
+                            grid[previous_y][previous_x] = steam2
+                            active_steam_particles.add(steam1)
+                            active_steam_particles.add(steam2)
+                            particles_to_draw.add(steam1)
+                            particles_to_draw.add(steam2)
+                            particles_to_draw.discard(p)
+                            particles_to_draw.discard(water_particle)
+                            break
+
+
 def update_steam_particles():
     active_steam_particles_copy = active_steam_particles.copy()
     for p in active_steam_particles_copy:
         previous_x, previous_y = p.x, p.y
         moved = False
-        condensed = False
         top = False
         ny = previous_y - 1
         if ny >= 0:
+            cell_above = grid[ny][previous_x]
             for dx in random.sample([-1, 0, 1], 3):
                 nx = previous_x + dx
                 if 0 <= nx < GRID_WIDTH:
-                    if grid[ny][nx] == None and not (grid[ny][previous_x] != None and grid[previous_y][nx] != None):
-                        p.x = nx
-                        p.y = ny
-                        p.tx, p.ty = p.x, p.y
-                        moved = True
-                        break
+                    cell_adjacent = grid[previous_y][nx]
+                    target_cell = grid[ny][nx]
+                    if target_cell == None:
+                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID]):
+                            p.x = nx
+                            p.y = ny
+                            p.tx, p.ty = p.x, p.y
+                            moved = True
+                            break
+                    elif target_cell.type == FIRE_ID:
+                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID]):
+                            p.x = nx
+                            p.y = ny
+                            p.tx, p.ty = p.x, p.y
+                            moved = True
+                            grid[ny][nx] = None
+                            fire_particles.discard(target_cell)
+                            break
+
         if not moved:
             top = True
             if ny >= 0:
                 for dx in range(-1, 0, 1):
-                    if grid[ny][p.x + dx] is not None and grid[ny][p.x + dx].type not in [STONE_ID, CHROMATIC_ID]:
+                    nx = previous_x + dx
+                    if grid[ny][nx] == None or grid[ny][nx].type not in [STONE_ID, CHROMATIC_ID]:
                         top = False
                         break
 
@@ -197,7 +260,6 @@ def _find_furthest_spread_x(original_x, current_y, dx_direction, grid, GRID_WIDT
 def update_particles():
     global grid, active_particles, active_particles_copy, particles_to_clear, particles_to_draw
     active_particles_copy = active_particles.copy()
-
     while active_particles_copy:
         buckets = [[] for _ in range(GRID_HEIGHT)]
         for p in active_particles_copy:
@@ -232,6 +294,13 @@ def update_particles():
                         final_x, final_y = nx, ny
                         last_empty = (nx, ny)
                         continue
+                    elif cell_content.type == FIRE_ID:
+                        final_x, final_y = nx, ny
+                        last_empty = (nx, ny)
+                        fire_particles.discard(cell_content)
+                        grid[ny][nx] = None
+                        particles_to_clear.add((nx, ny))
+                        continue
 
                     # swap between two particles
                     elif (cell_content.type == WATER_ID and p.type == SAND_ID) or cell_content.type == STEAM_ID:
@@ -245,7 +314,7 @@ def update_particles():
                 if (previous_x, previous_y) != (final_x, final_y):
                     grid[previous_y][previous_x] = None
                     p.x, p.y = final_x, final_y
-                    grid[p.y][p.x] = None
+                    grid[final_y][final_x] = None
 
                     if cell_content is not None and ((p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID):
                         cell_content.x = last_empty[0]
@@ -289,16 +358,23 @@ def update_particles():
                                 p.tx, p.ty = p.x, p.y
                                 moved = True
                                 break
+                            elif cell_content.type == FIRE_ID:
+                                grid[previous_y][previous_x] = None
+                                grid[ny][nx] = None
+                                p.x, p.y = nx, ny
+                                p.tx, p.ty = nx, ny
+                                moved = True
+                                fire_particles.discard(cell_content)
 
                             elif (p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID:
-                                grid[p.y][p.x] = None
+                                grid[previous_y][previous_x] = None
                                 grid[ny][nx] = None
                                 grid[previous_y][previous_x] = cell_content
                                 cell_content.x, cell_content.tx = previous_x, previous_x
                                 cell_content.y, cell_content.ty = previous_y, previous_y
                                 p.x, p.y = nx, ny
 
-                                p.tx, p.ty = float(p.x), float(p.y)
+                                p.tx, p.ty = nx, ny
                                 # p.vx *= 0.6
                                 # p.vy *= 0.6
 

@@ -12,6 +12,7 @@ water_button = None
 stone_button = None
 chromatic_button = None
 steam_button = None
+fire_button = None
 material_display_label = None
 pause_button = None
 clear_button = None
@@ -28,7 +29,7 @@ def update_material_label_text(text):
 
 
 def init_ui(target_screen):
-    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, material_display_label, pause_button, clear_button
+    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, fire_button, material_display_label, pause_button, clear_button
     sand_button = Button(
         target_screen,
         850,  # X-coordinate of top left corner
@@ -82,7 +83,7 @@ def init_ui(target_screen):
 
     chromatic_button = Button(
         target_screen,
-        955,  # X-coordinate
+        1060,  # X-coordinate
         260,  # Y-coordinate
         95,   # Width
         50,   # Height
@@ -109,6 +110,22 @@ def init_ui(target_screen):
         inactiveColour=(210, 215, 220),
         hoverColour=(180, 185, 190),
         pressedColour=(150, 155, 160),
+        radius=10,
+    )
+
+    fire_button = Button(
+        target_screen,
+        955,  # X-coordinate
+        260,  # Y-coordinate
+        95,   # Width
+        50,   # Height
+        text="Fire",
+        font=pygame.font.SysFont("Arial", 24, bold=True),
+        margin=10,
+        textColour=(255, 255, 255),
+        inactiveColour=(255, 153, 0),
+        hoverColour=(204, 102, 0),
+        pressedColour=(153, 51, 0),
         radius=10,
     )
 

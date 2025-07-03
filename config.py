@@ -1,7 +1,7 @@
 import pygame
 import utils
 
-CELL_SIZE = 10
+CELL_SIZE = 8
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -18,16 +18,20 @@ RANDOM_SPAWN_PROBABILITY = 0.75
 CONDENSE_PROBABILITY = 0.01
 # how many steam particle is needed to make one water particle on average
 STEAM_TO_WATER_RATIO = 2
+# probability that the fire dies each frames, simulating a lifespan
+FIRE_DIES_PROBABILITY = 0.05
 EMPTY_ID = 0
 SAND_ID = 1
 WATER_ID = 2
 STONE_ID = 3
 CHROMATIC_ID = 4
 STEAM_ID = 5
-current_material = SAND_ID  # Start with sand
+FIRE_ID = 6
+current_material = FIRE_ID  # Start with sand
 simulation_is_on = True
 frame_count = 0
 MAX_SPREAD_DIST = 4
+
 
 SAND_COLORS = [
     (210, 180, 140),
@@ -58,10 +62,17 @@ CHROMATIC_COLORS = [
 ]
 
 STEAM_COLORS = [
-    (240, 240, 240),  # Almost White
-    (225, 225, 225),  # Very Light Gray
-    (210, 210, 210),  # Subtle Gray
-    (195, 195, 195)   # Faint Shadow Gray
+    (240, 240, 240),
+    (225, 225, 225),
+    (210, 210, 210),
+    (195, 195, 195)
+]
+
+FIRE_COLORS = [
+    (255, 255, 102),  # Bright Yellow (hottest core)
+    (255, 204, 0),    # Golden Orange (main flame body)
+    (255, 102, 0),    # Fiery Orange (deeper, more intense parts)
+    (204, 51, 0)      # Deep Red-Orange (outer edges, cooler parts)
 ]
 
 EMPTY_COLOR = (0, 0, 0)

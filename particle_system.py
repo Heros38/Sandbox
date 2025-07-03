@@ -8,7 +8,7 @@ from numba import jit
 
 
 class Particle:
-    __slots__ = ('type', 'x', 'y', 'tx', 'ty', 'vx', 'vy', 'color')
+    __slots__ = ('type', 'x', 'y', 'tx', 'ty', 'vx', 'vy', 'color', 'lifespan')
 
     def __init__(self, type, x, y, color):
         self.type = type
@@ -19,6 +19,7 @@ class Particle:
         self.vx = 0.0
         self.vy = 1.0
         self.color = color
+        self.lifespan = 0
 
     def __repr__(self):
         return f"P(x:{self.x}, y:{self.y})"
@@ -90,19 +91,25 @@ def update_near_particles(x: int, y: int):
                         active_steam_particles.add(p)
 
 
+@jit(nopython=True, cache=True, fastmath=True)
+def calculate_color_index(current_time: float, p_x: int, p_y: int, speed_factor: int, spatial_factor: int, palette_size: int):
+    return int(current_time * speed_factor + p_x * spatial_factor + p_y * spatial_factor) % palette_size
+
 def cycle_colors(CHROMATIC_PALETTE: list, palette_size: int):
+    current_time = time.time()
     for p in chromatic_particles:
         speed_factor = 50
         spatial_factor = 2
-        index = int(time.time() * speed_factor + p.x *
-                    spatial_factor + p.y * spatial_factor) % palette_size
+        
+        index = calculate_color_index(current_time, p.x, p.y, speed_factor, spatial_factor, palette_size)
+        
         new_color = CHROMATIC_PALETTE[index]
         if p.color != new_color:
             p.color = new_color
             particles_to_draw.add(p)
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True, fastmath=True)
 def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
     V2 = vx**2 + vy**2
     if V2 > 0.0001:
@@ -120,8 +127,9 @@ def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
 def update_fire_particles():
     fire_particles_copy = fire_particles.copy()
     for p in fire_particles_copy:
+        p.lifespan -= 1
         previous_x, previous_y = p.x, p.y
-        if random.random() <= FIRE_DIES_PROBABILITY:
+        if random.random() <= FIRE_DIES_PROBABILITY or p.lifespan == 0:
             grid[previous_y][previous_x] = None
             fire_particles.discard(p)
             particles_to_clear.add((previous_x, previous_y))

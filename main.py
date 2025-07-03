@@ -144,8 +144,7 @@ while running:
                                     if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
                                         if config.RANDOM_SPAWN_PROBABILITY >= random.random():
                                             if particle_system.grid[ny][nx] is None:
-                                                p = particle_system.Particle(
-                                                    config.SAND_ID, nx, ny, random.choice(config.SAND_COLORS))
+                                                p = particle_system.Particle(config.SAND_ID, nx, ny, random.choice(config.SAND_COLORS))
                                                 if config.random_velocity:
                                                     p.vx = vx
                                                     p.vy = vy
@@ -160,8 +159,7 @@ while running:
                                     if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
                                         if config.RANDOM_SPAWN_PROBABILITY >= random.random():
                                             if particle_system.grid[ny][nx] is None:
-                                                p = particle_system.Particle(
-                                                    config.WATER_ID, nx, ny, random.choice(config.WATER_COLORS))
+                                                p = particle_system.Particle(config.WATER_ID, nx, ny, random.choice(config.WATER_COLORS))
                                                 if config.random_velocity:
                                                     p.vx = vx
                                                     p.vy = vy
@@ -185,8 +183,7 @@ while running:
                                     nx, ny = x + dx, y + dy
                                     if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
                                         if particle_system.grid[ny][nx] is None:
-                                            p = particle_system.Particle(
-                                                config.CHROMATIC_ID, nx, ny, random.choice(config.CHROMATIC_COLORS))
+                                            p = particle_system.Particle(config.CHROMATIC_ID, nx, ny, random.choice(config.CHROMATIC_COLORS))
                                             particle_system.grid[ny][nx] = p
                                             particle_system.chromatic_particles.add(p)
 
@@ -208,8 +205,8 @@ while running:
                                     nx, ny = x + dx, y + dy
                                     if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
                                         if particle_system.grid[ny][nx] is None:
-                                            p = particle_system.Particle(
-                                                config.FIRE_ID, nx, ny, random.choice(config.FIRE_COLORS))
+                                            p = particle_system.Particle(config.FIRE_ID, nx, ny, random.choice(config.FIRE_COLORS))
+                                            p.lifespan = config.FIRE_LIFESPAN + random.randint(-config.FIRE_LIFESPAN_VARIATION, config.FIRE_LIFESPAN_VARIATION)
                                             particle_system.grid[ny][nx] = p
                                             particle_system.fire_particles.add(p)
                                             particle_system.particles_to_draw.add(p)
@@ -231,13 +228,12 @@ while running:
                                         particle_system.fire_particles.discard(p)
         prev_pos = (gx, gy)
     else:
-        prev_pos = None
+        prev_pos = None 
     
     particle_system.draw_grid(screen)
     pygame.draw.rect(screen, (30, 30, 30), (config.WINDOW_WIDTH - config.TOOLBAR_WIDTH, 0, config.TOOLBAR_WIDTH, config.WINDOW_HEIGHT))
     ui_elements.pygame_widgets.update(events)
-    if config.frame_count % 2 == 0:
-        particle_system.cycle_colors(CHROMATIC_PALETTE, palette_size)
+    particle_system.cycle_colors(CHROMATIC_PALETTE, palette_size)
     if ui_elements.brush_slider != None:
         spawn_radius = ui_elements.brush_slider.getValue()
         ui_elements.brush_size_label.setText(f"Brush Size: {spawn_radius}")

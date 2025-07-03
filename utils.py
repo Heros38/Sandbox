@@ -1,9 +1,9 @@
 # import math
-from numba import jit
+from numba import jit, types
 import numpy as np
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def get_line(x0: int, y0: int, x1: int, y1: int):
     points = []
     dx = abs(x1 - x0)
@@ -46,7 +46,7 @@ def generate_palette(colors_table: list, steps=60):
     return palette
 
 
-@jit(nopython=True)
+@jit(nopython=True, cache=True)
 def get_shuffled_tab(tab: list):
     directions = np.array(tab, dtype=np.int32)
     np.random.shuffle(directions)

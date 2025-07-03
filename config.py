@@ -1,7 +1,7 @@
 import pygame
 import utils
 
-CELL_SIZE = 8
+CELL_SIZE = 5
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
@@ -14,12 +14,11 @@ FRICTION = 0.02
 spawn_radius = 0
 random_velocity = False
 RANDOM_SPAWN_PROBABILITY = 0.75
-# probability that the steam turns into water when at the top of the screen
-CONDENSE_PROBABILITY = 0.01
-# how many steam particle is needed to make one water particle on average
-STEAM_TO_WATER_RATIO = 2
-# probability that the fire dies each frames, simulating a lifespan
-FIRE_DIES_PROBABILITY = 0.05
+CONDENSE_PROBABILITY = 0.01 # probability that the steam turns into water when at the top of the screen
+STEAM_TO_WATER_RATIO = 2 # how many steam particle is needed to make one water particle on average
+FIRE_DIES_PROBABILITY = 0.03 # probability that the fire dies each frames, simulating a lifespan
+FIRE_LIFESPAN = 20 # fire can't live more than this many frames
+FIRE_LIFESPAN_VARIATION = 4 # FIRE_LIFESPAN gets +- FIRE_LIFESPAN_VARIATION for each fire particle
 EMPTY_ID = 0
 SAND_ID = 1
 WATER_ID = 2
@@ -27,7 +26,7 @@ STONE_ID = 3
 CHROMATIC_ID = 4
 STEAM_ID = 5
 FIRE_ID = 6
-current_material = FIRE_ID  # Start with sand
+current_material = SAND_ID  # Start with sand
 simulation_is_on = True
 frame_count = 0
 MAX_SPREAD_DIST = 4

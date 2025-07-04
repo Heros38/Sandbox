@@ -34,6 +34,7 @@ chromatic_particles = set()
 active_smoke_particles = set()
 fire_particles = set()
 burning_wood = set()
+acid_particles = set()
 
 
 def initialize_grid():
@@ -66,19 +67,23 @@ def update_near_particles(x: int, y: int):
             if 0 <= nx < GRID_WIDTH:
                 p = grid[ny][nx]
                 if p is not None:
-                    if p.type in (SAND_ID, WATER_ID):
+                    if p.type in (SAND_ID, WATER_ID, ACID_ID):
                         if p not in active_particles:
                             active_particles.add(p)
                             active_particles_copy.add(p)
+                        if p.type == ACID_ID:
+                            acid_particles.add(p)
     for dx in [-1, 1]:  # water because it can spread sideways (also steam)
         nx = x + dx
         if 0 <= nx < GRID_WIDTH:
             p = grid[y][nx]
             if p is not None:
-                if p.type == WATER_ID:
+                if p.type in (WATER_ID, ACID_ID):
                     if p not in active_particles:
                         active_particles.add(p)
                         active_particles_copy.add(p)
+                    if p.type == ACID_ID:
+                        acid_particles.add(p)
                 elif p.type == STEAM_ID or p.type == SMOKE_ID:
                     active_smoke_particles.add(p)
     ny = y + 1
@@ -124,6 +129,31 @@ def apply_gravity(vx: float, vy: float, tx: float, ty: float, gravity: float):
     target_ty = ty + vy
     return target_tx, target_ty, round(target_tx), round(target_ty), vx, vy
 
+def update_acid_particles():
+    acid_particles_copy = acid_particles.copy()
+    for p in acid_particles_copy:
+        previous_x, previous_y = p.x, p.y
+        for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            nx, ny = p.x + dx, p.y + dy
+            if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                target_cell = grid[ny][nx]
+                if target_cell != None and target_cell.type != ACID_ID:
+                    grid[previous_y][previous_x] = None
+                    grid[ny][nx] = None
+                    active_particles.discard(p)
+                    acid_particles.discard(p)
+                    particles_to_draw.discard(p)
+                    active_particles.discard(target_cell)
+                    fire_particles.discard(target_cell)
+                    burning_wood.discard(target_cell)
+                    active_smoke_particles.discard(target_cell)
+                    chromatic_particles.discard(target_cell)
+                    particles_to_draw.discard(target_cell)
+                    particles_to_clear.add((previous_x, previous_y))
+                    particles_to_clear.add((nx, ny))
+                    update_near_particles(nx, ny)
+                    update_near_particles(previous_x, previous_y)
+                    break
 
 def update_fire_particles():
     fire_particles_copy = fire_particles.copy()
@@ -295,7 +325,6 @@ def update_smoke_particles():
         
         
         if top:
-            
             r = random.random()
             if p.type == STEAM_ID:
                 if r <= CONDENSE_PROBABILITY:  # steam condenses into water
@@ -487,7 +516,7 @@ def update_particles():
                                 moved = True
                                 break
 
-                if not moved and p.type == WATER_ID:
+                if not moved and (p.type == WATER_ID or p.type == ACID_ID):
 
                     direction1 = 1
                     direction2 = -1

@@ -73,6 +73,9 @@ def set_wood_material_callback():
     config.current_material = config.WOOD_ID
     ui_elements.update_material_label_text(f"Current: Wood")
 
+def set_acid_material_callback():
+    config.current_material = config.ACID_ID
+    ui_elements.update_material_label_text(f"Current: Acid")
 
 def toggle_simulation_callback():
     config.simulation_is_on = not config.simulation_is_on
@@ -111,6 +114,7 @@ ui_elements.chromatic_button.onClick = set_chromatic_material_callback
 ui_elements.steam_button.onClick = set_steam_material_callback
 ui_elements.fire_button.onClick = set_fire_material_callback
 ui_elements.wood_button.onClick = set_wood_material_callback
+ui_elements.acid_button.onClick = set_acid_material_callback
 ui_elements.pause_button.onClick = toggle_simulation_callback
 ui_elements.clear_button.onClick = clear_screen
 
@@ -120,6 +124,7 @@ while running:
     if config.simulation_is_on:
         #print("--- Start of Frame ---")
         #print(f"fire_particles count before update_particles: {len(particle_system.fire_particles)}")
+        particle_system.update_acid_particles()
         particle_system.update_particles()
         #print(f"fire_particles count after update_particles: {len(particle_system.fire_particles)}")
         #print(f"fire_particles count before update_steam_particles: {len(particle_system.fire_particles)}")
@@ -130,6 +135,7 @@ while running:
         #print(f"fire_particles count AFTER update_fire_particles: {len(particle_system.fire_particles)}")
         #print(particle_system.fire_particles)
         particle_system.update_burning_wood()
+        
     mouse_pos = pygame.mouse.get_pos()
     events = pygame.event.get()
     for event in events:
@@ -231,6 +237,18 @@ while running:
                                             p.lifespan = config.FIRE_LIFESPAN + random.randint(-config.FIRE_LIFESPAN_VARIATION, config.FIRE_LIFESPAN_VARIATION)
                                             particle_system.grid[ny][nx] = p
                                             particle_system.fire_particles.add(p)
+                                            particle_system.particles_to_draw.add(p)
+                        
+                        elif config.current_material == config.ACID_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
+                                        if particle_system.grid[ny][nx] is None:
+                                            p = particle_system.Particle(config.ACID_ID, nx, ny, random.choice(config.ACID_COLORS))
+                                            particle_system.grid[ny][nx] = p
+                                            particle_system.active_particles.add(p)
+                                            particle_system.acid_particles.add(p)
                                             particle_system.particles_to_draw.add(p)
 
                     elif mouse_buttons[2]:  # Right click // Air

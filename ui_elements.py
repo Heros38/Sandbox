@@ -17,6 +17,7 @@ wood_button = None
 material_display_label = None
 pause_button = None
 clear_button = None
+acid_button = None
 
 
 def update_brush_label_text(text):
@@ -30,7 +31,7 @@ def update_material_label_text(text):
 
 
 def init_ui(target_screen):
-    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, fire_button, wood_button, material_display_label, pause_button, clear_button
+    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, fire_button, wood_button, material_display_label, pause_button, clear_button, acid_button
     sand_button = Button(
         target_screen,
         SCREEN_WIDTH + 50,  # X-coordinate of top left corner
@@ -144,6 +145,22 @@ def init_ui(target_screen):
         inactiveColour=(255, 153, 0),
         hoverColour=(204, 102, 0),
         pressedColour=(153, 51, 0),
+        radius=10,
+    )
+
+    acid_button = Button(
+        target_screen,
+        SCREEN_WIDTH + 50,  # X-coordinate
+        320,  # Y-coordinate
+        95,   # Width
+        50,   # Height
+        text="Acid",
+        font=pygame.font.SysFont("Arial", 24, bold=True),
+        margin=10,
+        textColour=(255, 255, 255),
+        inactiveColour=(153, 255, 0),
+        hoverColour=(102, 204, 0),
+        pressedColour=(51, 153, 0),
         radius=10,
     )
 

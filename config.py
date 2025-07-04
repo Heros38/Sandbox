@@ -1,10 +1,11 @@
 import pygame
 import utils
 
-CELL_SIZE = 5
-WINDOW_WIDTH = 1200
+CELL_SIZE = 8
+WINDOW_WIDTH = 1600
 WINDOW_HEIGHT = 600
 TOOLBAR_WIDTH = 400
+SCREEN_WIDTH = WINDOW_WIDTH - TOOLBAR_WIDTH
 GRID_HEIGHT = WINDOW_HEIGHT // CELL_SIZE
 GRID_WIDTH = (WINDOW_WIDTH - TOOLBAR_WIDTH) // CELL_SIZE
 FPS_LIMIT = 60
@@ -26,10 +27,15 @@ STONE_ID = 3
 CHROMATIC_ID = 4
 STEAM_ID = 5
 FIRE_ID = 6
+WOOD_ID = 7
+BURNING_WOOD_ID = 8
 current_material = SAND_ID  # Start with sand
 simulation_is_on = True
 frame_count = 0
-MAX_SPREAD_DIST = 4
+MAX_SPREAD_DIST = 4 # water
+BURNING_SPREAD_PROBABILITY = 0.01
+BURNING_WOOD_LIFESPAN = 80
+SPAWN_FIRE_PROBABILITY = 0.1 #probability of making a fire particle when burning wood
 
 
 SAND_COLORS = [
@@ -68,10 +74,22 @@ STEAM_COLORS = [
 ]
 
 FIRE_COLORS = [
-    (255, 255, 102),  # Bright Yellow (hottest core)
-    (255, 204, 0),    # Golden Orange (main flame body)
-    (255, 102, 0),    # Fiery Orange (deeper, more intense parts)
-    (204, 51, 0)      # Deep Red-Orange (outer edges, cooler parts)
+    (255, 255, 102),
+    (255, 204, 0),
+    (255, 102, 0),
+    (204, 51, 0) 
+]
+
+WOOD_COLORS = [
+    (150, 95, 45), 
+    (100, 60, 30), 
+    (200, 140, 90) 
+]
+
+BURNING_WOOD_COLORS = [
+    (70, 40, 20),
+    (200, 80, 0),
+    (255, 200, 100)
 ]
 
 EMPTY_COLOR = (0, 0, 0)

@@ -33,6 +33,7 @@ particles_to_draw = set()
 chromatic_particles = set()
 active_steam_particles = set()
 fire_particles = set()
+burning_wood = set()
 
 
 def initialize_grid():
@@ -140,7 +141,8 @@ def update_fire_particles():
                 for dx in random.sample([-1, 0, 1], 3):
                     nx = previous_x + dx
                     if 0 <= nx < GRID_WIDTH:
-                        if grid[ny][nx] == None:  # fire just moves
+                        target_cell = grid[ny][nx]
+                        if target_cell == None:  # fire just moves
                             p.x = nx
                             p.y = ny
                             p.tx, p.ty = p.x, p.y
@@ -150,7 +152,7 @@ def update_fire_particles():
                             particles_to_draw.add(p)
                             break
                         # fire encounters water -> create steam
-                        elif grid[ny][nx].type == WATER_ID:
+                        elif target_cell.type == WATER_ID:
                             water_particle = grid[ny][nx]
                             grid[ny][nx] = None
                             grid[previous_y][previous_x] = None
@@ -167,9 +169,77 @@ def update_fire_particles():
                             particles_to_draw.add(steam1)
                             particles_to_draw.add(steam2)
                             particles_to_draw.discard(p)
-                            particles_to_draw.discard(water_particle)
+                            break
+                        # fire encounters wood, making burning wood
+                        elif target_cell.type == WOOD_ID:
+                            grid[ny][nx] = None
+                            grid[previous_y][previous_x] = None
+                            fire_particles.discard(p)
+                            particles_to_draw.discard(p)
+                            particles_to_clear.add((previous_x, previous_y))
+                            burning_wood_particle = Particle(BURNING_WOOD_ID, nx, ny, random.choice(BURNING_WOOD_COLORS))
+                            burning_wood_particle.lifespan = BURNING_WOOD_LIFESPAN
+                            grid[ny][nx] = burning_wood_particle
+                            particles_to_draw.add(burning_wood_particle)
+                            burning_wood.add(burning_wood_particle)
                             break
 
+def update_burning_wood():
+    burning_wood_copy = burning_wood.copy()
+    for p in burning_wood_copy:
+        previous_x, previous_y = p.x, p.y
+        burnt = False
+        p.lifespan -= 1
+
+        for dy in range(-1, 2):
+                ny = previous_y + dy
+                if 0 <= ny < GRID_HEIGHT:
+                    for dx in range(-1, 2):
+                        nx = previous_x + dx
+                        if 0 <= nx < GRID_WIDTH:
+                            checked_cell = grid[ny][nx]
+                            if checked_cell != None and checked_cell.type == WATER_ID:
+                                grid[ny][nx] = None
+                                grid[previous_y][previous_x] = None
+                                burning_wood.discard(p)
+                                active_particles.discard(checked_cell)
+                                steam_particle = Particle(STEAM_ID, nx, ny, random.choice(STEAM_COLORS))
+                                wood_particle = Particle(WOOD_ID, previous_x, previous_y, random.choice(WOOD_COLORS))
+                                grid[previous_y][previous_x] = wood_particle
+                                grid[ny][nx] = steam_particle
+                                active_steam_particles.add(steam_particle)
+                                particles_to_draw.add(steam_particle)
+                                particles_to_draw.add(wood_particle)
+                                continue
+
+
+        if p.lifespan == 0:
+            grid[p.y][previous_x] = None
+            burning_wood.discard(p)
+            particles_to_clear.add((previous_x, previous_y))
+            if random.random() <= SPAWN_FIRE_PROBABILITY:
+                fire_particle = Particle(FIRE_ID, previous_x, previous_y, random.choice(FIRE_COLORS))
+                p.lifespan = FIRE_LIFESPAN + random.randint(-FIRE_LIFESPAN_VARIATION, FIRE_LIFESPAN_VARIATION)
+                grid[previous_y][previous_x] = fire_particle
+                fire_particles.add(fire_particle)
+            burnt = True
+        
+        if random.random() <= BURNING_SPREAD_PROBABILITY or burnt: #burn other wood particle around
+            update_near_particles(previous_x, previous_y)
+            for dy in range(-1, 2):
+                ny = previous_y + dy
+                if 0 <= ny < GRID_HEIGHT:
+                    for dx in range(-1, 2):
+                        nx = previous_x + dx
+                        if 0 <= nx < GRID_WIDTH:
+                            checked_cell = grid[ny][nx]
+                            if checked_cell != None and checked_cell.type == WOOD_ID:
+                                grid[ny][nx] = None
+                                burning_wood_particle = Particle(BURNING_WOOD_ID, nx, ny, random.choice(BURNING_WOOD_COLORS))
+                                burning_wood_particle.lifespan = BURNING_WOOD_LIFESPAN
+                                grid[ny][nx] = burning_wood_particle
+                                particles_to_draw.add(burning_wood_particle)
+                                burning_wood.add(burning_wood_particle)
 
 def update_steam_particles():
     active_steam_particles_copy = active_steam_particles.copy()
@@ -186,14 +256,14 @@ def update_steam_particles():
                     cell_adjacent = grid[previous_y][nx]
                     target_cell = grid[ny][nx]
                     if target_cell == None:
-                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID]):
+                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID, WOOD_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID, WOOD_ID]):
                             p.x = nx
                             p.y = ny
                             p.tx, p.ty = p.x, p.y
                             moved = True
                             break
                     elif target_cell.type == FIRE_ID:
-                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID]):
+                        if cell_above == None or cell_adjacent == None or (cell_above.type not in [CHROMATIC_ID, STONE_ID, WOOD_ID] and cell_adjacent.type not in [CHROMATIC_ID, STONE_ID, WOOD_ID]):
                             p.x = nx
                             p.y = ny
                             p.tx, p.ty = p.x, p.y
@@ -207,7 +277,7 @@ def update_steam_particles():
             if ny >= 0:
                 for dx in range(-1, 0, 1):
                     nx = previous_x + dx
-                    if grid[ny][nx] == None or grid[ny][nx].type not in [STONE_ID, CHROMATIC_ID]:
+                    if grid[ny][nx] == None or grid[ny][nx].type not in [STONE_ID, CHROMATIC_ID, WOOD_ID]:
                         top = False
                         break
 
@@ -358,7 +428,7 @@ def update_particles():
                             cell_adjacent = grid[p.y][nx]
                             cell_under = grid[ny][p.x]
                             if (cell_adjacent != None and cell_under != None):
-                                if cell_adjacent.type in [STONE_ID, CHROMATIC_ID] and cell_under.type in [STONE_ID, CHROMATIC_ID]:
+                                if cell_adjacent.type in [STONE_ID, CHROMATIC_ID, WOOD_ID] and cell_under.type in [STONE_ID, CHROMATIC_ID, WOOD_ID]:
                                     continue
                             if cell_content is None:
                                 grid[previous_y][previous_x] = None
@@ -373,6 +443,7 @@ def update_particles():
                                 p.tx, p.ty = nx, ny
                                 moved = True
                                 fire_particles.discard(cell_content)
+                                break
 
                             elif (p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID:
                                 grid[previous_y][previous_x] = None
@@ -394,8 +465,6 @@ def update_particles():
                                 break
 
                 if not moved and p.type == WATER_ID:
-                    current_x = p.x
-                    current_y = p.y
 
                     direction1 = 1
                     direction2 = -1
@@ -403,30 +472,31 @@ def update_particles():
                         direction1 = -1
                         direction2 = 1
 
-                    final_new_x = current_x
-                    moved_in_this_step = False
+                    final_new_x = previous_x
 
                     calculated_new_x = _find_furthest_spread_x(
-                        current_x, current_y, direction1, grid, GRID_WIDTH, MAX_SPREAD_DIST)
-                    if calculated_new_x != current_x:
+                        previous_x, previous_y, direction1, grid, GRID_WIDTH, MAX_SPREAD_DIST)
+                    if calculated_new_x != previous_x:
                         final_new_x = calculated_new_x
-                        moved_in_this_step = True
-                    else:
-                        calculated_new_x = _find_furthest_spread_x(
-                            current_x, current_y, direction2, grid, GRID_WIDTH, MAX_SPREAD_DIST)
-                        if calculated_new_x != current_x:
-                            final_new_x = calculated_new_x
-                            moved_in_this_step = True
-
-                    if moved_in_this_step:
                         grid[previous_y][previous_x] = None
-
                         p.x = final_new_x
-                        p.y = current_y
+                        p.y = previous_y
                         p.tx = p.x
                         p.ty = p.y
                         moved = True
+                    else:
+                        calculated_new_x = _find_furthest_spread_x(
+                            previous_x, previous_y, direction2, grid, GRID_WIDTH, MAX_SPREAD_DIST)
+                        if calculated_new_x != previous_x:
+                            final_new_x = calculated_new_x
+                            grid[previous_y][previous_x] = None
+                            p.x = final_new_x
+                            p.y = previous_y
+                            p.tx = p.x
+                            p.ty = p.y
+                            moved = True                     
 
+                        
                 # Update grid
                 grid[p.y][p.x] = p
 

@@ -26,7 +26,7 @@ def fps_counter():
     fps = str(int(clock.get_fps()))
     fps_font = pygame.font.SysFont("Arial", 24, bold=True)
     fps_t = fps_font.render(f'fps: {fps}', 1, pygame.Color("RED"))
-    screen.blit(fps_t, (810, 565))
+    screen.blit(fps_t, (config.SCREEN_WIDTH + 10, 565))
 
 
 def set_sand_material_callback():
@@ -58,6 +58,10 @@ def set_fire_material_callback():
     config.current_material = config.FIRE_ID
     ui_elements.update_material_label_text(f"Current: Fire")
 
+def set_wood_material_callback():
+    config.current_material = config.WOOD_ID
+    ui_elements.update_material_label_text(f"Current: Wood")
+
 
 def toggle_simulation_callback():
     config.simulation_is_on = not config.simulation_is_on
@@ -80,6 +84,7 @@ def clear_screen():
     particle_system.chromatic_particles.clear()
     particle_system.active_steam_particles.clear()
     particle_system.fire_particles.clear()
+    particle_system.burning_wood.clear()
     particle_system.initialize_grid()
 
 
@@ -94,6 +99,7 @@ ui_elements.stone_button.onClick = set_stone_material_callback
 ui_elements.chromatic_button.onClick = set_chromatic_material_callback
 ui_elements.steam_button.onClick = set_steam_material_callback
 ui_elements.fire_button.onClick = set_fire_material_callback
+ui_elements.wood_button.onClick = set_wood_material_callback
 ui_elements.pause_button.onClick = toggle_simulation_callback
 ui_elements.clear_button.onClick = clear_screen
 
@@ -112,12 +118,7 @@ while running:
         particle_system.update_fire_particles()
         #print(f"fire_particles count AFTER update_fire_particles: {len(particle_system.fire_particles)}")
         #print(particle_system.fire_particles)
-        list_of_particles = []
-        for line in particle_system.grid:
-            for p in line:
-                if p != None:
-                    list_of_particles.append(p)
-        #print(list_of_particles)
+        particle_system.update_burning_wood()
     mouse_pos = pygame.mouse.get_pos()
     events = pygame.event.get()
     for event in events:
@@ -186,6 +187,16 @@ while running:
                                             p = particle_system.Particle(config.CHROMATIC_ID, nx, ny, random.choice(config.CHROMATIC_COLORS))
                                             particle_system.grid[ny][nx] = p
                                             particle_system.chromatic_particles.add(p)
+                        
+                        elif config.current_material == config.WOOD_ID:
+                            for dx in range(-spawn_radius, spawn_radius+1):
+                                for dy in range(-spawn_radius, spawn_radius+1):
+                                    nx, ny = x + dx, y + dy
+                                    if 0 <= nx < config.GRID_WIDTH and 0 <= ny < config.GRID_HEIGHT:
+                                        if particle_system.grid[ny][nx] is None:
+                                            p = particle_system.Particle(config.WOOD_ID, nx, ny, random.choice(config.WOOD_COLORS))
+                                            particle_system.grid[ny][nx] = p
+                                            particle_system.particles_to_draw.add(p)
 
                         elif config.current_material == config.STEAM_ID:
                             for dx in range(-spawn_radius, spawn_radius+1):

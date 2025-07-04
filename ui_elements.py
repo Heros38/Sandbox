@@ -13,6 +13,7 @@ stone_button = None
 chromatic_button = None
 steam_button = None
 fire_button = None
+wood_button = None
 material_display_label = None
 pause_button = None
 clear_button = None
@@ -29,10 +30,10 @@ def update_material_label_text(text):
 
 
 def init_ui(target_screen):
-    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, fire_button, material_display_label, pause_button, clear_button
+    global brush_slider, brush_size_label, sand_button, water_button, stone_button, chromatic_button, steam_button, fire_button, wood_button, material_display_label, pause_button, clear_button
     sand_button = Button(
         target_screen,
-        850,  # X-coordinate of top left corner
+        SCREEN_WIDTH + 50,  # X-coordinate of top left corner
         200,  # Y-coordinate of top left corner
         95,  # Width
         50,  # Height
@@ -49,7 +50,7 @@ def init_ui(target_screen):
 
     water_button = Button(
         target_screen,
-        955,  # X-coordinate of top left corner
+        SCREEN_WIDTH + 155,  # X-coordinate of top left corner
         200,  # Y-coordinate of top left corner
         95,  # Width
         50,  # Height
@@ -66,7 +67,7 @@ def init_ui(target_screen):
 
     stone_button = Button(
         target_screen,
-        1060,  # X-coordinate of top left corner
+        SCREEN_WIDTH + 260,  # X-coordinate of top left corner
         200,  # Y-coordinate of top left corner
         95,  # Width
         50,  # Height
@@ -81,10 +82,27 @@ def init_ui(target_screen):
         radius=10,
     )
 
+    wood_button = Button(
+        target_screen,
+        SCREEN_WIDTH + 260,  # X-coordinate of top left corner
+        260,  # Y-coordinate of top left corner
+        95,  # Width
+        50,  # Height
+
+        text="Wood",
+        font=pygame.font.SysFont("Arial", 24, bold=True),
+        margin=10,
+        textColour=(255, 255, 255),
+        inactiveColour=(150, 95, 45),
+        hoverColour=(120, 80, 50),
+        pressedColour=(70, 40, 15),
+        radius=10,
+    )
+
     chromatic_button = Button(
         target_screen,
-        1060,  # X-coordinate
-        260,  # Y-coordinate
+        SCREEN_WIDTH + 155,  # X-coordinate
+        320,  # Y-coordinate
         95,   # Width
         50,   # Height
         text="Chromatic",
@@ -99,7 +117,7 @@ def init_ui(target_screen):
 
     steam_button = Button(
         target_screen,
-        850,  # X-coordinate
+        SCREEN_WIDTH + 50,  # X-coordinate
         260,  # Y-coordinate
         95,   # Width
         50,   # Height
@@ -115,7 +133,7 @@ def init_ui(target_screen):
 
     fire_button = Button(
         target_screen,
-        955,  # X-coordinate
+        SCREEN_WIDTH + 155,  # X-coordinate
         260,  # Y-coordinate
         95,   # Width
         50,   # Height
@@ -131,7 +149,7 @@ def init_ui(target_screen):
 
     material_display_label = TextBox(
         target_screen,
-        900, 320,  # X, Y
+        SCREEN_WIDTH + 100, 380,  # X, Y
         200, 30,  # Width, Height
         font=pygame.font.SysFont("Arial", 18),
         textColour=(255, 255, 255),
@@ -145,8 +163,8 @@ def init_ui(target_screen):
 
     pause_button = Button(
         target_screen,
-        900,  # X-coordinate of top left corner
-        360,  # Y-coordinate of top left corner
+        SCREEN_WIDTH + 100,  # X-coordinate of top left corner
+        420,  # Y-coordinate of top left corner
         95,  # Width
         50,  # Height
 
@@ -162,8 +180,8 @@ def init_ui(target_screen):
 
     clear_button = Button(
         target_screen,
-        1005,  # X-coordinate of top left corner
-        360,  # Y-coordinate of top left corner
+        SCREEN_WIDTH + 205,  # X-coordinate of top left corner
+        420,  # Y-coordinate of top left corner
         95,  # Width
         50,  # Height
 
@@ -179,7 +197,7 @@ def init_ui(target_screen):
 
     brush_slider = Slider(
         target_screen,
-        900, 100,  # X, Y position
+        SCREEN_WIDTH + 100, 100,  # X, Y position
         200, 30,  # Width, Height
         min=0, max=6, step=1,
         initial=spawn_radius,
@@ -191,7 +209,7 @@ def init_ui(target_screen):
 
     brush_size_label = TextBox(
         target_screen,
-        940, 140,  # X, Y position
+        SCREEN_WIDTH + 140, 140,  # X, Y position
         110, 30,  # Width, Height
         font=pygame.font.SysFont("Arial", 18),
         textColour=(255, 255, 255),

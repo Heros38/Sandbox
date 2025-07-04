@@ -1,6 +1,8 @@
 # import math
 from numba import jit, types
 import numpy as np
+import pygame
+import math
 
 
 @jit(nopython=True, cache=True)
@@ -51,3 +53,22 @@ def get_shuffled_tab(tab: list):
     directions = np.array(tab, dtype=np.int32)
     np.random.shuffle(directions)
     return directions
+
+
+
+def get_text_pixels_pygame(text:str, grid_width:int, grid_height:int, height_center:float):
+    tempscreen = pygame.Surface((grid_width, grid_height))
+    font = pygame.font.SysFont("Arial", 30, bold=True)
+    tempscreen.fill((0, 0, 0))
+    text_surface = font.render(text, True, (255, 255, 255))
+    text_rect = text_surface.get_rect()
+    text_rect.center = (grid_width // 2, (grid_height * height_center) // 2)
+    tempscreen.blit(text_surface, text_rect)
+
+    tab = []
+    #tab = [[0 for _ in range(grid_width)] for _ in range(grid_height)] 
+    for y in range(grid_height):
+        for x in range(grid_width):
+            if tempscreen.get_at((x, y)) == (255, 255, 255):
+                tab.append((x, y))
+    return tab

@@ -199,7 +199,7 @@ def init_ui(target_screen):
         target_screen,
         SCREEN_WIDTH + 100, 100,  # X, Y position
         200, 30,  # Width, Height
-        min=0, max=6, step=1,
+        min=0, max=5, step=1,
         initial=spawn_radius,
 
         colour=(40, 44, 52),

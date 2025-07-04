@@ -21,10 +21,21 @@ particle_system.apply_gravity(1.0, 1.0, 10.0, 10.0, 1.0)
 utils.get_line(0, 0, 0, 0)
 utils.get_shuffled_tab([1, 2])
 
+if config.ANNIVERSAIRE:
+    tab = utils.get_text_pixels_pygame("HAPPY", config.GRID_WIDTH, config.GRID_HEIGHT, 0.6)
+    for (x, y) in tab:
+        p = particle_system.Particle(config.CHROMATIC_ID, x, y, random.choice(config.CHROMATIC_COLORS))
+        particle_system.grid[y][x] = p
+        particle_system.chromatic_particles.add(p)
+    tab = utils.get_text_pixels_pygame("BIRTHDAY", config.GRID_WIDTH, config.GRID_HEIGHT, 1.4)
+    for (x, y) in tab:
+        p = particle_system.Particle(config.CHROMATIC_ID, x, y, random.choice(config.CHROMATIC_COLORS))
+        particle_system.grid[y][x] = p
+        particle_system.chromatic_particles.add(p)
 
+fps_font = pygame.font.SysFont("Arial", 24, bold=True)
 def fps_counter():
     fps = str(int(clock.get_fps()))
-    fps_font = pygame.font.SysFont("Arial", 24, bold=True)
     fps_t = fps_font.render(f'fps: {fps}', 1, pygame.Color("RED"))
     screen.blit(fps_t, (config.SCREEN_WIDTH + 10, 565))
 

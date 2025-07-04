@@ -36,7 +36,7 @@ MAX_SPREAD_DIST = 4 # water
 BURNING_SPREAD_PROBABILITY = 0.01
 BURNING_WOOD_LIFESPAN = 80
 SPAWN_FIRE_PROBABILITY = 0.1 #probability of making a fire particle when burning wood
-
+ANNIVERSAIRE = True
 
 SAND_COLORS = [
     (210, 180, 140),

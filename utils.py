@@ -58,7 +58,7 @@ def get_shuffled_tab(tab: list):
 
 def get_text_pixels_pygame(text:str, grid_width:int, grid_height:int, height_center:float):
     tempscreen = pygame.Surface((grid_width, grid_height))
-    font = pygame.font.SysFont("Arial", 30, bold=True)
+    font = pygame.font.SysFont("Arial", 26, bold=True)
     tempscreen.fill((0, 0, 0))
     text_surface = font.render(text, True, (255, 255, 255))
     text_rect = text_surface.get_rect()

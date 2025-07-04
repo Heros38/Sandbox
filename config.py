@@ -68,10 +68,10 @@ STEAM_COLORS = [
 ]
 
 FIRE_COLORS = [
-    (255, 255, 102),  # Bright Yellow (hottest core)
-    (255, 204, 0),    # Golden Orange (main flame body)
-    (255, 102, 0),    # Fiery Orange (deeper, more intense parts)
-    (204, 51, 0)      # Deep Red-Orange (outer edges, cooler parts)
+    (255, 255, 102),  
+    (255, 204, 0), 
+    (255, 102, 0),  
+    (204, 51, 0)  
 ]
 
 EMPTY_COLOR = (0, 0, 0)

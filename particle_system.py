@@ -31,7 +31,7 @@ active_particles_copy = set()
 particles_to_clear = set()
 particles_to_draw = set()
 chromatic_particles = set()
-active_steam_particles = set()
+active_smoke_particles = set()
 fire_particles = set()
 burning_wood = set()
 
@@ -79,8 +79,8 @@ def update_near_particles(x: int, y: int):
                     if p not in active_particles:
                         active_particles.add(p)
                         active_particles_copy.add(p)
-                elif p.type == STEAM_ID:
-                    active_steam_particles.add(p)
+                elif p.type == STEAM_ID or p.type == SMOKE_ID:
+                    active_smoke_particles.add(p)
     ny = y + 1
     if 0 <= ny < GRID_HEIGHT:
         for dx in [-1, 0, 1]:  # elements that go upwards like steam
@@ -88,8 +88,8 @@ def update_near_particles(x: int, y: int):
             if 0 <= nx < GRID_WIDTH:
                 p = grid[ny][nx]
                 if p is not None:
-                    if p.type == STEAM_ID:
-                        active_steam_particles.add(p)
+                    if p.type == STEAM_ID or p.type == SMOKE_ID:
+                        active_smoke_particles.add(p)
 
 
 @jit(nopython=True, cache=True, fastmath=True)
@@ -133,8 +133,14 @@ def update_fire_particles():
         if random.random() <= FIRE_DIES_PROBABILITY or p.lifespan == 0:
             grid[previous_y][previous_x] = None
             fire_particles.discard(p)
-            particles_to_clear.add((previous_x, previous_y))
             particles_to_draw.discard(p)
+            if random.random() <= SPAWN_SMOKE_PROBABILITY_FIRE: #spawns smoke
+                smoke = Particle(SMOKE_ID, previous_x, previous_y, random.choice(SMOKE_COLORS))
+                active_smoke_particles.add(smoke)
+                grid[previous_y][previous_x] = smoke
+                particles_to_draw.add(smoke)
+            else:
+                particles_to_clear.add((previous_x, previous_y))
         else:
             ny = previous_y - 1
             if ny >= 0:
@@ -164,8 +170,8 @@ def update_fire_particles():
                             steam2 = Particle(STEAM_ID, previous_x, previous_y, random.choice(STEAM_COLORS))
                             grid[ny][nx] = steam1
                             grid[previous_y][previous_x] = steam2
-                            active_steam_particles.add(steam1)
-                            active_steam_particles.add(steam2)
+                            active_smoke_particles.add(steam1)
+                            active_smoke_particles.add(steam2)
                             particles_to_draw.add(steam1)
                             particles_to_draw.add(steam2)
                             particles_to_draw.discard(p)
@@ -207,7 +213,7 @@ def update_burning_wood():
                                 wood_particle = Particle(WOOD_ID, previous_x, previous_y, random.choice(WOOD_COLORS))
                                 grid[previous_y][previous_x] = wood_particle
                                 grid[ny][nx] = steam_particle
-                                active_steam_particles.add(steam_particle)
+                                active_smoke_particles.add(steam_particle)
                                 particles_to_draw.add(steam_particle)
                                 particles_to_draw.add(wood_particle)
                                 continue
@@ -217,11 +223,17 @@ def update_burning_wood():
             grid[p.y][previous_x] = None
             burning_wood.discard(p)
             particles_to_clear.add((previous_x, previous_y))
-            if random.random() <= SPAWN_FIRE_PROBABILITY:
+            r = random.random()
+            if r <= SPAWN_FIRE_PROBABILITY: #spawns fire particle
                 fire_particle = Particle(FIRE_ID, previous_x, previous_y, random.choice(FIRE_COLORS))
                 p.lifespan = FIRE_LIFESPAN + random.randint(-FIRE_LIFESPAN_VARIATION, FIRE_LIFESPAN_VARIATION)
                 grid[previous_y][previous_x] = fire_particle
                 fire_particles.add(fire_particle)
+            elif r <= SPAWN_SMOKE_PROBABILITY_WOOD:
+                smoke = Particle(SMOKE_ID, previous_x, previous_y, random.choice(SMOKE_COLORS))
+                active_smoke_particles.add(smoke)
+                grid[previous_y][previous_x] = smoke
+                particles_to_draw.add(smoke)
             burnt = True
         
         if random.random() <= BURNING_SPREAD_PROBABILITY or burnt: #burn other wood particle around
@@ -241,9 +253,9 @@ def update_burning_wood():
                                 particles_to_draw.add(burning_wood_particle)
                                 burning_wood.add(burning_wood_particle)
 
-def update_steam_particles():
-    active_steam_particles_copy = active_steam_particles.copy()
-    for p in active_steam_particles_copy:
+def update_smoke_particles():
+    active_smoke_particles_copy = active_smoke_particles.copy()
+    for p in active_smoke_particles_copy:
         previous_x, previous_y = p.x, p.y
         moved = False
         top = False
@@ -280,26 +292,37 @@ def update_steam_particles():
                     if grid[ny][nx] == None or grid[ny][nx].type not in [STONE_ID, CHROMATIC_ID, WOOD_ID]:
                         top = False
                         break
-
+        
+        
         if top:
+            
             r = random.random()
-            if r <= CONDENSE_PROBABILITY:  # steam condenses into water
-                grid[previous_y][previous_x] = None
-                water_particle = Particle(
-                    WATER_ID, previous_x, previous_y, random.choice(WATER_COLORS))
-                grid[previous_y][previous_x] = water_particle
-                particles_to_draw.add(water_particle)
-                active_particles.add(water_particle)
-                active_steam_particles.discard(p)
-                continue
-            elif r <= STEAM_TO_WATER_RATIO * CONDENSE_PROBABILITY:  # the steam dissapear
-                grid[previous_y][previous_x] = None
-                particles_to_clear.add((previous_x, previous_y))
-                active_steam_particles.discard(p)
-                update_near_particles(previous_x, previous_y)
-                continue
-
-        elif not moved:
+            if p.type == STEAM_ID:
+                if r <= CONDENSE_PROBABILITY:  # steam condenses into water
+                    
+                    grid[previous_y][previous_x] = None
+                    water_particle = Particle(
+                        WATER_ID, previous_x, previous_y, random.choice(WATER_COLORS))
+                    grid[previous_y][previous_x] = water_particle
+                    particles_to_draw.add(water_particle)
+                    active_particles.add(water_particle)
+                    active_smoke_particles.discard(p)
+                    continue
+                elif r <= STEAM_TO_WATER_RATIO * CONDENSE_PROBABILITY:  # the steam dissapear
+                    grid[previous_y][previous_x] = None
+                    particles_to_clear.add((previous_x, previous_y))
+                    active_smoke_particles.discard(p)
+                    update_near_particles(previous_x, previous_y)
+                    continue
+            elif p.type == SMOKE_ID:
+                if r <= SMOKE_DISSIPATE_PROBABILITY:
+                    grid[previous_y][previous_x] = None
+                    active_smoke_particles.discard(p)
+                    particles_to_clear.add((previous_x, previous_y))
+                    update_near_particles(previous_x, previous_y)
+                    continue
+            
+        if not moved:
             for dx in random.sample([-1, 1], 2):
                 nx = previous_x + dx
                 if 0 <= nx < GRID_WIDTH:
@@ -313,10 +336,10 @@ def update_steam_particles():
             grid[previous_y][previous_x] = None
             particles_to_draw.add(p)
             grid[p.y][p.x] = p
-            active_steam_particles.add(p)
+            active_smoke_particles.add(p)
             update_near_particles(previous_x, previous_y)
         elif not top:
-            active_steam_particles.discard(p)
+            active_smoke_particles.discard(p)
 
 
 def _find_furthest_spread_x(original_x, current_y, dx_direction, grid, GRID_WIDTH, MAX_SPREAD_DIST):
@@ -381,7 +404,7 @@ def update_particles():
                         continue
 
                     # swap between two particles
-                    elif (cell_content.type == WATER_ID and p.type == SAND_ID) or cell_content.type == STEAM_ID:
+                    elif (cell_content.type == WATER_ID and p.type == SAND_ID) or cell_content.type == STEAM_ID or cell_content.type == SMOKE_ID:
                         final_x, final_y = nx, ny
                         break
 
@@ -394,7 +417,7 @@ def update_particles():
                     p.x, p.y = final_x, final_y
                     grid[final_y][final_x] = None
 
-                    if cell_content is not None and ((p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID):
+                    if cell_content is not None and ((p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID or cell_content.type == SMOKE_ID):
                         cell_content.x = last_empty[0]
                         cell_content.y = last_empty[1]
                         cell_content.tx = cell_content.x
@@ -403,8 +426,8 @@ def update_particles():
                         if cell_content.type == WATER_ID and cell_content not in active_particles:
                             active_particles_copy.add(cell_content)
                             active_particles.add(cell_content)
-                        elif cell_content.type == STEAM_ID:
-                            active_steam_particles.add(cell_content)
+                        elif cell_content.type == STEAM_ID or cell_content.type == SMOKE_ID:
+                            active_smoke_particles.add(cell_content)
                         particles_to_draw.add(cell_content)
                         p.vx *= 0.6
                         p.vy *= 0.6
@@ -445,7 +468,7 @@ def update_particles():
                                 fire_particles.discard(cell_content)
                                 break
 
-                            elif (p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID:
+                            elif (p.type == SAND_ID and cell_content.type == WATER_ID) or cell_content.type == STEAM_ID or cell_content.type == SMOKE_ID:
                                 grid[previous_y][previous_x] = None
                                 grid[ny][nx] = None
                                 grid[previous_y][previous_x] = cell_content
@@ -457,7 +480,7 @@ def update_particles():
                                 # p.vx *= 0.6
                                 # p.vy *= 0.6
 
-                                if cell_content not in active_particles and cell_content.type != STEAM_ID:
+                                if cell_content not in active_particles and (cell_content.type != STEAM_ID and cell_content.type != SMOKE_ID):
                                     active_particles_copy.add(cell_content)
                                     active_particles.add(cell_content)
                                 particles_to_draw.add(cell_content)

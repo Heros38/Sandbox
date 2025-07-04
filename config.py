@@ -29,13 +29,18 @@ STEAM_ID = 5
 FIRE_ID = 6
 WOOD_ID = 7
 BURNING_WOOD_ID = 8
+SMOKE_ID = 9
+ACID_ID = 10
 current_material = SAND_ID  # Start with sand
 simulation_is_on = True
 frame_count = 0
 MAX_SPREAD_DIST = 4 # water
 BURNING_SPREAD_PROBABILITY = 0.01
 BURNING_WOOD_LIFESPAN = 80
-SPAWN_FIRE_PROBABILITY = 0.1 #probability of making a fire particle when burning wood
+SPAWN_FIRE_PROBABILITY = 0.3 #probability of making a fire particle when burning wood
+SPAWN_SMOKE_PROBABILITY_WOOD = SPAWN_FIRE_PROBABILITY + 0.3 #probability smoke appearing when wood burns or when fire dies
+SPAWN_SMOKE_PROBABILITY_FIRE = 0.05
+SMOKE_DISSIPATE_PROBABILITY = 0.06
 ANNIVERSAIRE = True
 
 SAND_COLORS = [
@@ -90,6 +95,18 @@ BURNING_WOOD_COLORS = [
     (70, 40, 20),
     (200, 80, 0),
     (255, 200, 100)
+]
+
+ACID_COLORS = [
+    (153, 255, 0),
+    (102, 204, 0),
+    (51, 153, 0)
+]
+
+SMOKE_COLORS = [
+    (150, 150, 150),
+    (100, 100, 100),
+    (70, 70, 70) 
 ]
 
 EMPTY_COLOR = (0, 0, 0)

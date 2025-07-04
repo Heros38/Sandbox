@@ -93,7 +93,7 @@ def clear_screen():
     particle_system.particles_to_clear.clear()
     particle_system.particles_to_draw.clear()
     particle_system.chromatic_particles.clear()
-    particle_system.active_steam_particles.clear()
+    particle_system.active_smoke_particles.clear()
     particle_system.fire_particles.clear()
     particle_system.burning_wood.clear()
     particle_system.initialize_grid()
@@ -123,7 +123,7 @@ while running:
         particle_system.update_particles()
         #print(f"fire_particles count after update_particles: {len(particle_system.fire_particles)}")
         #print(f"fire_particles count before update_steam_particles: {len(particle_system.fire_particles)}")
-        particle_system.update_steam_particles()
+        particle_system.update_smoke_particles()
         #print(f"fire_particles count after update_steam_particles: {len(particle_system.fire_particles)}")
         #print(f"fire_particles count before update_fire_particles: {len(particle_system.fire_particles)}")
         particle_system.update_fire_particles()
@@ -218,7 +218,7 @@ while running:
                                             if particle_system.grid[ny][nx] is None:
                                                 p = particle_system.Particle(config.STEAM_ID, nx, ny, random.choice(config.STEAM_COLORS))
                                                 particle_system.grid[ny][nx] = p
-                                                particle_system.active_steam_particles.add(p)
+                                                particle_system.active_smoke_particles.add(p)
                                                 particle_system.particles_to_draw.add(p)
 
                         elif config.current_material == config.FIRE_ID:
@@ -242,12 +242,12 @@ while running:
                                     if p is not None:
                                         particle_system.active_particles.discard(p)
                                         particle_system.grid[ny][nx] = None
-                                        particle_system.update_near_particles(nx, ny)
                                         particle_system.particles_to_clear.add((nx, ny))
                                         particle_system.particles_to_draw.discard(p)
                                         particle_system.chromatic_particles.discard(p)
-                                        particle_system.active_steam_particles.discard(p)
+                                        particle_system.active_smoke_particles.discard(p)
                                         particle_system.fire_particles.discard(p)
+                                        particle_system.update_near_particles(nx, ny)
         prev_pos = (gx, gy)
     else:
         prev_pos = None 

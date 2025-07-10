@@ -148,14 +148,13 @@ fn window_conf() -> Conf {
     }
 }
 
-fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: &mut Vec<(usize, usize, (u8, u8, u8))>){ 
-    if is_mouse_button_down(MouseButton::Left) {
-        let (mouse_x, mouse_y) = mouse_position();
+fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: &mut Vec<(usize, usize, (u8, u8, u8))>, particles_to_clear: &mut Vec<(usize, usize)>){ 
+    let (mouse_x, mouse_y) = mouse_position();
 
         let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
         let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
         let radius = 10; 
-
+    if is_mouse_button_down(MouseButton::Left) {
         for dx in -radius..=radius {
             for dy in -radius..=radius {
                 let target_grid_x = grid_x + dx;
@@ -185,6 +184,24 @@ fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: 
             }
         }
     }
+    else if is_mouse_button_down(MouseButton::Right) {
+        for dx in -radius..=radius {
+            for dy in -radius..=radius {
+                let target_grid_x = grid_x + dx;
+                let target_grid_y = grid_y + dy;
+
+                if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
+                   target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
+
+                    let target_grid_x = target_grid_x as usize;
+                    let target_grid_y = target_grid_y as usize;
+
+                    grid[target_grid_y][target_grid_x] = None;
+                    particles_to_clear.push((target_grid_x, target_grid_y));
+                }
+            }
+        }
+    }
 }
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -197,7 +214,7 @@ async fn main() {
     grid[7][15] = Some(create_particle(SAND_ID, 15, 7, 0.0, 1.0, *SAND_COLORS.choose(&mut thread_rng()).unwrap(), 0));
     loop {
         let start_time = Instant::now();
-        handle_mouse_input(&mut grid, &mut particles_to_draw);
+        handle_mouse_input(&mut grid, &mut particles_to_draw, &mut particles_to_clear);
         draw_screen(&particles_to_clear, &particles_to_draw);
         update_particles(&mut grid, &mut particles_to_clear, &mut particles_to_draw);
         next_frame().await;

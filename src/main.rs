@@ -3,14 +3,14 @@ use ::rand::seq::SliceRandom;
 use ::rand::thread_rng;
 use macroquad::prelude::*;
 use crate::miniquad::conf::Platform;
-use std::thread;
+use std::{thread, vec};
 use std::time::{Instant, Duration};
 
 
 const SAND_ID: usize = 1;
 const SCREEN_WIDTH: usize = 1600;
 const SCREEN_HEIGHT: usize = 800;
-const CELL_SIZE: usize = 4;
+const CELL_SIZE: usize = 5;
 const GRID_WIDTH: usize = SCREEN_WIDTH / CELL_SIZE;
 const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
 
@@ -57,9 +57,61 @@ fn create_particle(
     }
 }
 
+/* 
+def get_line(x0: int, y0: int, x1: int, y1: int):
+    points = []
+    dx = abs(x1 - x0)
+    dy = -abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx + dy
+
+    while True:
+        points.append((x0, y0))
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x0 += sx
+        if e2 <= dx:
+            err += dx
+            y0 += sy
+    return points
+*/
+
+fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize)>{
+    let mut points: Vec<(isize, isize)> = Vec::new();
+    let dx: isize = (x1 - x0).abs();
+    let dy: isize = -(y1 - y0).abs();
+    let sx = if x0 < x1 { 1 } else { -1 };
+    let sy = if y0 < y1 { 1 } else { -1 };
+    let mut err = dx + dy;
+
+    loop{
+        points.push((x0, y0));
+        if x0 == x1 && y0 == y1{break}
+        let e2 = 2 * &err;
+        if e2 >= dy{
+            err += &dy;
+            x0 += sx;
+        }
+        if e2 <= dx{
+            err += &dx;
+            y0 += sy;
+        }
+    }
+    return points
+}
+
+
 fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>) {
+    let mut rng = thread_rng();
     for y in (0..GRID_HEIGHT).rev() {
-        for x in 0..GRID_WIDTH {
+        let mut row_x_indices: Vec<usize> = (0..GRID_WIDTH).collect();
+        row_x_indices.shuffle(&mut rng); 
+
+        for x in row_x_indices {
             if let Some(mut p) = grid[y][x] {
                 //if let Some(mut p) = current_cell_ref.take(){
                 let previous_x: usize = x;
@@ -123,7 +175,7 @@ fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>) {
 fn draw_screen(image: &mut Image, texture: &mut Texture2D, grid: &Vec<Vec<Option<Particle>>>) {
     //println!("particles to clear: {:?}", particles_to_clear);
     //println!("particles to draw: {:?}", particles_to_draw);
-    for y in (0..GRID_HEIGHT){
+    for y in 0..GRID_HEIGHT{
         for x in 0..GRID_WIDTH {
             if let Some(current) = grid[y][x]{
                 let (r, g, b) = current.color;
@@ -161,62 +213,73 @@ fn window_conf() -> Conf {
     }
 }
 
-fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>){ 
-    let (mouse_x, mouse_y) = mouse_position();
-    let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
-    let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
-    let radius = 10; 
-    if is_mouse_button_down(MouseButton::Left) {
-        for dx in -radius..=radius {
-            for dy in -radius..=radius {
-                let target_grid_x: isize = grid_x + dx;
-                let target_grid_y: isize = grid_y + dy;
+fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, previous_pos: &mut (isize, isize)){ 
+    if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Right){
+        let (mouse_x, mouse_y) = mouse_position();
+        let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
+        let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
+        let radius = 10; 
+        if previous_pos.0 != -1{
+            for (x, y) in get_line(previous_pos.0, previous_pos.1, grid_x, grid_y){
+                if is_mouse_button_down(MouseButton::Left) {
+                    for dx in -radius..=radius {
+                        for dy in -radius..=radius {
+                            let target_grid_x: isize = x + dx;
+                            let target_grid_y: isize = y + dy;
 
-                if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
-                   target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
+                            if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
+                            target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
 
-                    let target_grid_x: usize = target_grid_x as usize;
-                    let target_grid_y: usize = target_grid_y as usize;
+                                let target_grid_x: usize = target_grid_x as usize;
+                                let target_grid_y: usize = target_grid_y as usize;
 
-                    if grid[target_grid_y][target_grid_x].is_none() {
-                        let new_sand_particle = create_particle(
-                            SAND_ID,
-                            target_grid_x,
-                            target_grid_y,
-                            0.0, 
-                            1.0, 
-                            *SAND_COLORS.choose(&mut thread_rng()).unwrap(),
-                            0,
-                        );
+                                if grid[target_grid_y][target_grid_x].is_none() {
+                                    let new_sand_particle = create_particle(
+                                        SAND_ID,
+                                        target_grid_x,
+                                        target_grid_y,
+                                        0.0, 
+                                        1.0, 
+                                        *SAND_COLORS.choose(&mut thread_rng()).unwrap(),
+                                        0,
+                                    );
 
-                        grid[target_grid_y][target_grid_x] = Some(new_sand_particle);
+                                    grid[target_grid_y][target_grid_x] = Some(new_sand_particle);
+                                }
+                            }
+                        }
+                    }
+                }
+                else if is_mouse_button_down(MouseButton::Right) {
+                    for dx in -radius..=radius {
+                        for dy in -radius..=radius {
+                            let target_grid_x = x + dx;
+                            let target_grid_y = y + dy;
+
+                            if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
+                            target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
+
+                                let target_grid_x = target_grid_x as usize;
+                                let target_grid_y = target_grid_y as usize;
+
+                                grid[target_grid_y][target_grid_x] = None;
+                            }
+                        }
                     }
                 }
             }
         }
-    }
-    else if is_mouse_button_down(MouseButton::Right) {
-        for dx in -radius..=radius {
-            for dy in -radius..=radius {
-                let target_grid_x = grid_x + dx;
-                let target_grid_y = grid_y + dy;
-
-                if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
-                   target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
-
-                    let target_grid_x = target_grid_x as usize;
-                    let target_grid_y = target_grid_y as usize;
-
-                    grid[target_grid_y][target_grid_x] = None;
-                }
-            }
-        }
+        *previous_pos = (grid_x, grid_y);
+    } else {
+        *previous_pos = (-1, -1)
     }
 }
+
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut grid: Vec<Vec<Option<Particle>>> = vec![vec![None; GRID_WIDTH as usize]; GRID_HEIGHT as usize];
     let mut bytes: Vec<u8> = Vec::new();
+    let mut previous_pos: (isize, isize) = (-1, -1);
     //set_fullscreen(true);
     bytes.resize(GRID_WIDTH * GRID_HEIGHT * 4, 0); 
 
@@ -229,14 +292,14 @@ async fn main() {
 
     loop {
         let start_time = Instant::now();
-        let start_update_time = Instant::now();
+        //let start_update_time = Instant::now();
         update_particles(&mut grid);
-        let end_update_time = Instant::now();
-        println!("update time: {}", end_update_time.duration_since(start_update_time).as_millis());
+        //let end_update_time = Instant::now();
+        //println!("update time: {}", end_update_time.duration_since(start_update_time).as_millis());
         
-        handle_mouse_input(&mut grid);
+        handle_mouse_input(&mut grid, &mut previous_pos);
         
-        let start_draw_time = Instant::now();
+        //let start_draw_time = Instant::now();
         draw_screen(&mut game_image, &mut game_texture, &grid);
         draw_texture_ex(
             &game_texture, 
@@ -251,8 +314,8 @@ async fn main() {
                 ..Default::default()
             },
         );
-        let end_draw_time = Instant::now();
-        println!("draw time: {}", end_draw_time.duration_since(start_draw_time).as_millis());
+        //let end_draw_time = Instant::now();
+        //println!("draw time: {}", end_draw_time.duration_since(start_draw_time).as_millis());
         
         next_frame().await;
         let end_time: Instant = Instant::now();

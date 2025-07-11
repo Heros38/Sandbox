@@ -13,6 +13,8 @@ const SCREEN_HEIGHT: usize = 800;
 const CELL_SIZE: usize = 5;
 const GRID_WIDTH: usize = SCREEN_WIDTH / CELL_SIZE;
 const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
+const GRAVITY: f32 = 0.2;
+const FRICTION: f32 = 0.02;
 
 
 const SAND_COLORS: [(u8, u8, u8); 4] = [
@@ -91,13 +93,13 @@ fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize
     loop{
         points.push((x0, y0));
         if x0 == x1 && y0 == y1{break}
-        let e2 = 2 * &err;
+        let e2 = 2 * err;
         if e2 >= dy{
-            err += &dy;
+            err += dy;
             x0 += sx;
         }
         if e2 <= dx{
-            err += &dx;
+            err += dx;
             y0 += sy;
         }
     }
@@ -112,65 +114,121 @@ fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>) {
         row_x_indices.shuffle(&mut rng); 
 
         for x in row_x_indices {
-            if let Some(mut p) = grid[y][x] {
-                //if let Some(mut p) = current_cell_ref.take(){
+            if let Some(mut p) = grid[y][x].take() {
                 let previous_x: usize = x;
                 let previous_y: usize = y;
                 let mut final_y: usize = y;
                 let mut final_x: usize = x;
                 let mut moved = false;
 
-                if p.type_id == SAND_ID {
-                    let target_y: usize = y + 1;
-                    if target_y < GRID_HEIGHT {
-                        if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(x)) {
-                            if target_cell.is_none() {
-                                moved = true;
-                                final_y = target_y;
-                            }
-                        }
+                let v2: f32 = p.vx*p.vx + p.vy*p.vy;
+                if v2 > 0.0001{
+                    let v: f32 = v2.sqrt();
+                    let damping: f32 = 1.0 - FRICTION * v;
+                    p.vx *= damping;
+                    p.vy = GRAVITY + damping * p.vy
+                } else{
+                    p.vy = GRAVITY
+                }
+                let target_tx = p.tx + p.vx;
+                let target_ty = p.ty + p.vy;
+
+                let path = get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize);
+
+                let mut collision: bool = false;
+
+                for (nx, ny) in path.clone().into_iter().skip(1){
                     
+                    if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
+                        collision = true;
+                        break
+                    }
+                    let cell_content = grid[ny as usize][nx as usize];
+                    if cell_content.is_none(){
+                        final_x = nx as usize;
+                        final_y = ny as usize;
+                    } else{
+                        collision = true;
+                        break
+                    }
+                }
+                if previous_x != final_x || previous_y != final_y{
+                    moved = true;
+                    if collision{
+                        p.tx = final_x as f32;
+                        p.ty = final_y as f32;
+                        p.vx *= 0.5;
 
-                        if !moved {
-                            let mut rng = thread_rng();
-                            let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
-                            if rng.gen_bool(0.5) {
-                                diagonal_offsets.reverse();
-                            }
+                    } else{
+                        p.tx = target_tx;
+                        p.ty = target_ty;
+                    }
+                }
+                
+                p.x = final_x;
+                p.y = final_y;
 
-                            for (dx, dy) in diagonal_offsets {
-                                let target_y: usize = (y as isize + dy) as usize;
-                                let target_x: usize = (x as isize + dx) as usize;
 
-                                if target_y < GRID_HEIGHT && target_x < GRID_WIDTH {
-                                    if target_x < GRID_WIDTH {
-                                        if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(target_x)) {
-                                            if target_cell.is_none() {
-                                                final_x = target_x;
-                                                final_y = target_y;
-                                                moved = true;
-                                                break;
-                                            }
-                                        }
+                if p.type_id == SAND_ID{
+                    if !moved { 
+                        let mut rng = thread_rng();
+                        let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
+                        if rng.gen_bool(0.5) {
+                            diagonal_offsets.reverse();
+                        }
+
+                        for (dx, dy) in diagonal_offsets {
+                            let target_y_diag: usize = (p.y as isize + dy) as usize;
+                            let target_x_diag: usize = (p.x as isize + dx) as usize;
+
+                            if target_y_diag < GRID_HEIGHT && target_x_diag < GRID_WIDTH {
+                                if let Some(target_cell) = grid.get_mut(target_y_diag).and_then(|row| row.get_mut(target_x_diag)) {
+                                    if target_cell.is_none() {
+                                        
+                                        p.x = target_x_diag;
+                                        p.y = target_y_diag;
+                                        p.tx = target_x_diag as f32;
+                                        p.ty = target_y_diag as f32;
+                                        moved = true;
+                                        break;
                                     }
                                 }
                             }
                         }
                     }
-                    //}
-                if moved{
-                    //let mut p = p;
-                    p.x = final_x;
-                    p.y = final_y;
-                    grid[previous_y][previous_x] = None;
-                    grid[final_y][final_x] = Some(p);
-                }   
-
                 }
+
+                if (final_y as isize) < (previous_y as isize - 10) { 
+                    println!("!!! LARGE UPWARD TELEPORT DETECTED !!!");
+                    println!("  Particle at initial (grid x:{}, y:{})", previous_x, previous_y);
+                    println!("  Final calculated grid position: ({}, {})", final_x, final_y);
+                    println!("  -------------------------------------");
+                    println!("  Initial Particle State: x={}, y={}, tx={:?}, ty={:?}, vx={:?}, vy={:?}",
+                             p.x, p.y, p.tx, p.ty, p.vx, p.vy);
+                    println!("  Constants: GRAVITY={:?}, FRICTION={:?}", GRAVITY, FRICTION);
+                    println!("  After Physics: vx={:?}, vy={:?}", p.vx, p.vy);
+                    println!("  Target Sub-pixel (before rounding): target_tx={:?}, target_ty={:?}", target_tx, target_ty);
+                    println!("  get_line input: start=({}, {}), end=({}, {})", p.tx.round(), p.ty.round(), target_tx.round(), target_ty.round()); // Updated debug print
+                    
+                    print!("  Path generated by get_line: ");
+                    for (idx, (px, py)) in path.iter().enumerate() {
+                        print!("({},{}); ", px, py);
+                        if idx > 20 { // Limit path printing for very long paths
+                            print!("... (truncated)"); 
+                            break; 
+                        }
+                    }
+                    println!();
+                    println!("  Collision flag after path traversal: {}", collision);
+                    println!("  Moved flag: {}", moved);
+                    println!("--------------------------------------\n");
+                }
+                grid[p.y][p.x] = Some(p);
             }
         }
     }
 }
+
 
 fn draw_screen(image: &mut Image, texture: &mut Texture2D, grid: &Vec<Vec<Option<Particle>>>) {
     //println!("particles to clear: {:?}", particles_to_clear);

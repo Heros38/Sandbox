@@ -57,51 +57,47 @@ fn create_particle(
     }
 }
 
-fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_clear: &mut Vec<(usize, usize)>, particles_to_draw: &mut Vec<(usize, usize, (u8, u8, u8))>) {
-    particles_to_clear.clear();
-    particles_to_draw.clear();
+fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>) {
     for y in (0..GRID_HEIGHT).rev() {
         for x in 0..GRID_WIDTH {
-            if let Some(current_cell_ref) = grid.get_mut(y).and_then(|row| row.get_mut(x)) {
-                if let Some(mut p) = current_cell_ref.take(){
-                    //println!("particle taken {x} {y}");
-                    let previous_x: usize = x;
-                    let previous_y: usize = y;
-                    let mut final_y: usize = y;
-                    let mut final_x: usize = x;
-                    let mut moved = false;
+            if let Some(mut p) = grid[y][x] {
+                //if let Some(mut p) = current_cell_ref.take(){
+                let previous_x: usize = x;
+                let previous_y: usize = y;
+                let mut final_y: usize = y;
+                let mut final_x: usize = x;
+                let mut moved = false;
 
-                    if p.type_id == SAND_ID {
-                        let target_y: usize = y + 1;
-                        if target_y < GRID_HEIGHT {
-                            if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(x)) {
-                                if target_cell.is_none() {
-                                    moved = true;
-                                    final_y = target_y;
-                                }
+                if p.type_id == SAND_ID {
+                    let target_y: usize = y + 1;
+                    if target_y < GRID_HEIGHT {
+                        if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(x)) {
+                            if target_cell.is_none() {
+                                moved = true;
+                                final_y = target_y;
                             }
-                        
+                        }
+                    
 
-                            if !moved {
-                                let mut rng = thread_rng();
-                                let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
-                                if rng.gen_bool(0.5) {
-                                    diagonal_offsets.reverse();
-                                }
+                        if !moved {
+                            let mut rng = thread_rng();
+                            let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
+                            if rng.gen_bool(0.5) {
+                                diagonal_offsets.reverse();
+                            }
 
-                                for (dx, dy) in diagonal_offsets {
-                                    let target_y: usize = (y as isize + dy) as usize;
-                                    let target_x: usize = (x as isize + dx) as usize;
+                            for (dx, dy) in diagonal_offsets {
+                                let target_y: usize = (y as isize + dy) as usize;
+                                let target_x: usize = (x as isize + dx) as usize;
 
-                                    if target_y < GRID_HEIGHT && target_x < GRID_WIDTH {
-                                        if target_x < GRID_WIDTH {
-                                            if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(target_x)) {
-                                                if target_cell.is_none() {
-                                                    final_x = target_x;
-                                                    final_y = target_y;
-                                                    moved = true;
-                                                    break;
-                                                }
+                                if target_y < GRID_HEIGHT && target_x < GRID_WIDTH {
+                                    if target_x < GRID_WIDTH {
+                                        if let Some(target_cell) = grid.get_mut(target_y).and_then(|row| row.get_mut(target_x)) {
+                                            if target_cell.is_none() {
+                                                final_x = target_x;
+                                                final_y = target_y;
+                                                moved = true;
+                                                break;
                                             }
                                         }
                                     }
@@ -109,13 +105,14 @@ fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_clear: &
                             }
                         }
                     }
+                    //}
+                if moved{
+                    //let mut p = p;
                     p.x = final_x;
                     p.y = final_y;
                     grid[previous_y][previous_x] = None;
                     grid[final_y][final_x] = Some(p);
-                    //println!("particle put back");
-                    particles_to_clear.push((previous_x, previous_y));
-                    particles_to_draw.push((final_x, final_y, p.color));
+                }   
 
                 }
             }
@@ -123,15 +120,31 @@ fn update_particles(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_clear: &
     }
 }
 
-fn draw_screen(particles_to_clear: &Vec<(usize, usize)>, particles_to_draw: &Vec<(usize, usize, (u8, u8, u8))>) {
+fn draw_screen(image: &mut Image, texture: &mut Texture2D, grid: &Vec<Vec<Option<Particle>>>) {
     //println!("particles to clear: {:?}", particles_to_clear);
     //println!("particles to draw: {:?}", particles_to_draw);
+    for y in (0..GRID_HEIGHT){
+        for x in 0..GRID_WIDTH {
+            if let Some(current) = grid[y][x]{
+                let (r, g, b) = current.color;
+                image.set_pixel(x as u32, y as u32, Color::from_rgba(r, g, b, 255));
+            } else{
+                image.set_pixel(x as u32, y as u32, BLACK);
+            }
+        }
+    }
+    /*
     for (x, y) in particles_to_clear {
-        draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, BLACK)
+        image.set_pixel(*x as u32, *y as u32, BLACK);
+        //draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, BLACK);
+        //println!("particle cleared at {x} {y}");
     }
     for (x, y, (r, g, b)) in particles_to_draw {
-        draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, Color::from_rgba(*r, *g, *b, 255))
+        image.set_pixel(*x as u32, *y as u32, Color::from_rgba(*r, *g, *b, 255));
+        //draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, Color::from_rgba(*r, *g, *b, 255))
     }
+     */
+    texture.update(image);
 }
 
 fn window_conf() -> Conf {
@@ -148,23 +161,22 @@ fn window_conf() -> Conf {
     }
 }
 
-fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: &mut Vec<(usize, usize, (u8, u8, u8))>, particles_to_clear: &mut Vec<(usize, usize)>){ 
+fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>){ 
     let (mouse_x, mouse_y) = mouse_position();
-
-        let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
-        let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
-        let radius = 10; 
+    let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
+    let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
+    let radius = 10; 
     if is_mouse_button_down(MouseButton::Left) {
         for dx in -radius..=radius {
             for dy in -radius..=radius {
-                let target_grid_x = grid_x + dx;
-                let target_grid_y = grid_y + dy;
+                let target_grid_x: isize = grid_x + dx;
+                let target_grid_y: isize = grid_y + dy;
 
                 if target_grid_x >= 0 && target_grid_x < GRID_WIDTH as isize &&
                    target_grid_y >= 0 && target_grid_y < GRID_HEIGHT as isize {
 
-                    let target_grid_x = target_grid_x as usize;
-                    let target_grid_y = target_grid_y as usize;
+                    let target_grid_x: usize = target_grid_x as usize;
+                    let target_grid_y: usize = target_grid_y as usize;
 
                     if grid[target_grid_y][target_grid_x].is_none() {
                         let new_sand_particle = create_particle(
@@ -178,7 +190,6 @@ fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: 
                         );
 
                         grid[target_grid_y][target_grid_x] = Some(new_sand_particle);
-                        particles_to_draw.push((target_grid_x, target_grid_y, new_sand_particle.color));
                     }
                 }
             }
@@ -197,7 +208,6 @@ fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: 
                     let target_grid_y = target_grid_y as usize;
 
                     grid[target_grid_y][target_grid_x] = None;
-                    particles_to_clear.push((target_grid_x, target_grid_y));
                 }
             }
         }
@@ -206,24 +216,50 @@ fn handle_mouse_input(grid: &mut Vec<Vec<Option<Particle>>>, particles_to_draw: 
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut grid: Vec<Vec<Option<Particle>>> = vec![vec![None; GRID_WIDTH as usize]; GRID_HEIGHT as usize];
-    let mut particles_to_clear: Vec<(usize, usize)> = Vec::new();
-    let mut particles_to_draw: Vec<(usize, usize, (u8, u8, u8))> = Vec::new();
-    grid[5][3] = Some(create_particle(SAND_ID, 3, 5, 0.0, 1.0, *SAND_COLORS.choose(&mut thread_rng()).unwrap(), 0));
-    grid[6][3] = Some(create_particle(SAND_ID, 3, 6, 0.0, 1.0, *SAND_COLORS.choose(&mut thread_rng()).unwrap(), 0));
-    grid[7][3] = Some(create_particle(SAND_ID, 3, 7, 0.0, 1.0, *SAND_COLORS.choose(&mut thread_rng()).unwrap(), 0));
-    grid[7][15] = Some(create_particle(SAND_ID, 15, 7, 0.0, 1.0, *SAND_COLORS.choose(&mut thread_rng()).unwrap(), 0));
+    let mut bytes: Vec<u8> = Vec::new();
+    //set_fullscreen(true);
+    bytes.resize(GRID_WIDTH * GRID_HEIGHT * 4, 0); 
+
+    for i in (3..bytes.len()).step_by(4) {
+        bytes[i] = 255;
+    }
+    let mut game_image = Image {bytes, width: GRID_WIDTH as u16, height: GRID_HEIGHT as u16};
+    let mut game_texture = Texture2D::from_image(&game_image);
+    game_texture.set_filter(FilterMode::Nearest);
+
     loop {
         let start_time = Instant::now();
-        handle_mouse_input(&mut grid, &mut particles_to_draw, &mut particles_to_clear);
-        draw_screen(&particles_to_clear, &particles_to_draw);
-        update_particles(&mut grid, &mut particles_to_clear, &mut particles_to_draw);
+        let start_update_time = Instant::now();
+        update_particles(&mut grid);
+        let end_update_time = Instant::now();
+        println!("update time: {}", end_update_time.duration_since(start_update_time).as_millis());
+        
+        handle_mouse_input(&mut grid);
+        
+        let start_draw_time = Instant::now();
+        draw_screen(&mut game_image, &mut game_texture, &grid);
+        draw_texture_ex(
+            &game_texture, 
+            0.0,
+            0.0,
+            WHITE, 
+            DrawTextureParams {
+                dest_size: Some(vec2(
+                    GRID_WIDTH as f32 * CELL_SIZE as f32,
+                    GRID_HEIGHT as f32 * CELL_SIZE as f32,
+                )),
+                ..Default::default()
+            },
+        );
+        let end_draw_time = Instant::now();
+        println!("draw time: {}", end_draw_time.duration_since(start_draw_time).as_millis());
+        
         next_frame().await;
-        let end_time = Instant::now();
+        let end_time: Instant = Instant::now();
         let sleep_duration_ms = 1000.0 / 60.0 - end_time.duration_since(start_time).as_millis() as f32;
 
         if sleep_duration_ms > 0.0 {
             thread::sleep(Duration::from_millis(sleep_duration_ms as u64));
         }
-        draw_fps();
     }
 }

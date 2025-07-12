@@ -8,6 +8,8 @@ Controls :
   * LMB to place element
   * RMB to replace by air
 
-About the experimental version, it's not stable yet but provide significant performance boost :) you'll need to install cython, use python 3.12.2 (IMPORTANT) and use a C compiler to compile the pyx file if the compiled version isn't there.
+Don't use the experimental version (it requires a c compiler and knowledge about the project + it's not up to date).
 
-I might add a more detailed explanation later.
+The rust version will probably replace the python version in the future, but it's not at that point yet.
+
+Have fun !

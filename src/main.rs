@@ -16,7 +16,7 @@ const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
 const GRAVITY: f32 = 0.2;
 const FRICTION: f32 = 0.02;
 
-const CHUNK_SIZE: usize = 80;
+const CHUNK_SIZE: usize = 40;
 const CHUNKS_X: usize = GRID_WIDTH / CHUNK_SIZE;
 const CHUNKS_Y: usize = GRID_HEIGHT / CHUNK_SIZE;
 
@@ -125,19 +125,16 @@ fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize
     return points
 }
 
-fn _get_scanline(chunks: &Vec<Vec<Chunk>>, cy: usize, ) -> Vec<Vec<(usize, usize, usize)>> {
+fn get_scanline(chunks: &Vec<Vec<Chunk>>, cy: usize, ) -> Vec<Vec<(usize, usize)>> {
     let mut rng = thread_rng();
-
-    let mut scanlines: Vec<Vec<(usize, usize, usize)>> = vec![vec![]; CHUNK_SIZE];
+    let mut scanlines: Vec<Vec<(usize, usize)>> = vec![vec![]; CHUNK_SIZE];
 
     for y_local in (0..CHUNK_SIZE).rev(){
-        let mut line: Vec<(usize, usize, usize)> = Vec::new();
+        let mut line: Vec<(usize, usize)> = Vec::new();
         for cx in 0..CHUNKS_X{
             let chunk = &chunks[cy][cx];
             if chunk.is_active {
-                for x_local in 0..CHUNK_SIZE{
-                    line.push((x_local, y_local, cx));
-                }
+                line.push((cx * CHUNK_SIZE, (cx+1) * CHUNK_SIZE));
             }
         }
         line.shuffle(&mut rng);
@@ -152,147 +149,149 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
 
     for chunk_y in (0..CHUNKS_Y as usize).rev() { 
-        for chunk_x in 0..CHUNKS_X as usize { 
-            if let Some(chunk) = chunks.get_mut(chunk_y).and_then(|row| row.get_mut(chunk_x)) {
-                if chunk.is_active {
-                    let mut still_active = false;
-                    for y_local in (0..CHUNK_SIZE).rev() {
-                        let mut row_x_indices: Vec<usize> = (0..CHUNK_SIZE).collect();
-                        row_x_indices.shuffle(&mut rng);
+        let scanlines = get_scanline(chunks, chunk_y);
+        for cx in 0..CHUNKS_X {
+            let chunk = &mut chunks[chunk_y][cx];
+            chunk.is_active = false;
+        }
 
-                        for x_local in row_x_indices {
-                            let x_global = chunk_x * CHUNK_SIZE + x_local;
-                            let y_global = chunk_y * CHUNK_SIZE + y_local;
+        for y_local in (0..CHUNK_SIZE).rev() {
+            let y_global = chunk_y * CHUNK_SIZE + y_local;
 
-                            if let Some(mut p) = chunks[chunk_y][chunk_x].particles[y_local][x_local].take() {
+            let lines = &scanlines[y_local]; 
+            for chunk_line in lines {
+                let mut row_x_indices: Vec<usize> = (chunk_line.0..chunk_line.1).collect();
+                row_x_indices.shuffle(&mut rng);
+                let chunk_x = chunk_line.0 / CHUNK_SIZE;
 
-                                let previous_x: usize = x_global;
-                                let previous_y: usize = y_global;
-                                let mut final_x: usize = x_global;
-                                let mut final_y: usize = y_global;
-                                let mut moved = false;
+                for x_global in row_x_indices {
+                    let x_local = x_global % CHUNK_SIZE;
+                    if let Some(mut p) = chunks[chunk_y][chunk_x].particles[y_local][x_local].take() {
 
-                                let v2: f32 = p.vx*p.vx + p.vy*p.vy;
-                                if v2 > 0.0001{
-                                    let v: f32 = v2.sqrt();
-                                    let damping: f32 = 1.0 - FRICTION * v;
-                                    p.vx *= damping;
-                                    p.vy = GRAVITY + damping * p.vy
-                                } else{
-                                    p.vy = GRAVITY
+                        let previous_x: usize = x_global;
+                        let previous_y: usize = y_global;
+                        let mut final_x: usize = x_global;
+                        let mut final_y: usize = y_global;
+                        let mut moved = false;
+
+                        let v2: f32 = p.vx*p.vx + p.vy*p.vy;
+                        if v2 > 0.0001{
+                            let v: f32 = v2.sqrt();
+                            let damping: f32 = 1.0 - FRICTION * v;
+                            p.vx *= damping;
+                            p.vy = GRAVITY + damping * p.vy
+                        } else{
+                            p.vy = GRAVITY
+                        }
+                        let target_tx = p.tx + p.vx;
+                        let target_ty = p.ty + p.vy;
+
+                        let path = get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize);
+
+                        let mut collision: bool = false;
+
+                        for (nx, ny) in path.clone().into_iter().skip(1){
+                            if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
+                                collision = true;
+                                break
+                            }
+                            let target_chunk_x = (nx as usize) / CHUNK_SIZE;
+                            let target_chunk_y = (ny as usize) / CHUNK_SIZE;
+                            let target_local_x = (nx as usize) % CHUNK_SIZE;
+                            let target_local_y = (ny as usize) % CHUNK_SIZE;
+
+                            if chunks[target_chunk_y][target_chunk_x].particles[target_local_y][target_local_x].is_none(){
+                                final_x = nx as usize;
+                                final_y = ny as usize;
+                            } else{
+                                collision = true;
+                                break
+                            }
+                        }
+                        if previous_x != final_x || previous_y != final_y{
+                            moved = true;
+                            if collision{
+                                p.tx = final_x as f32;
+                                p.ty = final_y as f32;
+                                p.vx *= 0.5;
+
+                            } else{
+                                p.tx = target_tx;
+                                p.ty = target_ty;
+                            }
+                        }
+                        
+                        p.x = final_x;
+                        p.y = final_y;
+
+                        if p.type_id == SAND_ID{
+                            if !moved {
+                                let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
+                                if rng.gen_bool(0.5) {
+                                    diagonal_offsets.reverse();
                                 }
-                                let target_tx = p.tx + p.vx;
-                                let target_ty = p.ty + p.vy;
 
-                                let path = get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize);
+                                for (dx, dy) in diagonal_offsets {
+                                    let target_x_diag_global = p.x as isize + dx;
+                                    let target_y_diag_global = p.y as isize + dy;
 
-                                let mut collision: bool = false;
-
-                                for (nx, ny) in path.clone().into_iter().skip(1){
-                                    if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
-                                        collision = true;
-                                        break
-                                    }
-                                    let target_chunk_x = (nx as usize) / CHUNK_SIZE;
-                                    let target_chunk_y = (ny as usize) / CHUNK_SIZE;
-                                    let target_local_x = (nx as usize) % CHUNK_SIZE;
-                                    let target_local_y = (ny as usize) % CHUNK_SIZE;
-
-                                    if chunks[target_chunk_y][target_chunk_x].particles[target_local_y][target_local_x].is_none(){
-                                        final_x = nx as usize;
-                                        final_y = ny as usize;
-                                    } else{
-                                        collision = true;
-                                        break
-                                    }
-                                }
-                                if previous_x != final_x || previous_y != final_y{
-                                    moved = true;
-                                    if collision{
-                                        p.tx = final_x as f32;
-                                        p.ty = final_y as f32;
-                                        p.vx *= 0.5;
-
-                                    } else{
-                                        p.tx = target_tx;
-                                        p.ty = target_ty;
-                                    }
-                                }
-                                
-                                p.x = final_x;
-                                p.y = final_y;
-
-                                if p.type_id == SAND_ID{
-                                    if !moved {
-                                        let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
-                                        if rng.gen_bool(0.5) {
-                                            diagonal_offsets.reverse();
+                                    if target_x_diag_global >= 0 && target_x_diag_global < GRID_WIDTH as isize &&
+                                    target_y_diag_global >= 0 && target_y_diag_global < GRID_HEIGHT as isize {
+                                        
+                                        let target_chunk_x = target_x_diag_global as usize / CHUNK_SIZE;
+                                        let target_chunk_y = target_y_diag_global as usize / CHUNK_SIZE;
+                                        let target_local_x = target_x_diag_global as usize % CHUNK_SIZE;
+                                        let target_local_y = target_y_diag_global as usize % CHUNK_SIZE;
+                                        
+                                        if chunks[target_chunk_y][target_chunk_x].particles[target_local_y][target_local_x].is_none() {
+                                            p.x = target_x_diag_global as usize;
+                                            p.y = target_y_diag_global as usize;
+                                            p.tx = p.x as f32;
+                                            p.ty = p.y as f32;
+                                            moved = true;
+                                            break;
                                         }
-
-                                        for (dx, dy) in diagonal_offsets {
-                                            let target_x_diag_global = p.x as isize + dx;
-                                            let target_y_diag_global = p.y as isize + dy;
-
-                                            if target_x_diag_global >= 0 && target_x_diag_global < GRID_WIDTH as isize &&
-                                            target_y_diag_global >= 0 && target_y_diag_global < GRID_HEIGHT as isize {
-                                                
-                                                let target_chunk_x = target_x_diag_global as usize / CHUNK_SIZE;
-                                                let target_chunk_y = target_y_diag_global as usize / CHUNK_SIZE;
-                                                let target_local_x = target_x_diag_global as usize % CHUNK_SIZE;
-                                                let target_local_y = target_y_diag_global as usize % CHUNK_SIZE;
-                                                
-                                                if chunks[target_chunk_y][target_chunk_x].particles[target_local_y][target_local_x].is_none() {
-                                                    p.x = target_x_diag_global as usize;
-                                                    p.y = target_y_diag_global as usize;
-                                                    p.tx = p.x as f32;
-                                                    p.ty = p.y as f32;
-                                                    moved = true;
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                final_x = p.x;
-                                final_y = p.y;
-                                if let Some(pixel_slice) = image_data.get_mut(previous_x + previous_y * GRID_WIDTH) {
-                                    *pixel_slice = [0, 0, 0, 255]; 
-                                }
-                                if let Some(pixel_slice) = image_data.get_mut(final_x + final_y * GRID_WIDTH) {
-                                    let (r, g, b) = p.color;
-                                    *pixel_slice = [r, g, b, 255]; 
-                                }
-                                
-
-                                if !moved {
-                                    p.vy *= 0.7;
-                                } else {
-                                    still_active = true;
-                                }
-
-                                let final_chunk_x = p.x / CHUNK_SIZE;
-                                let final_chunk_y = p.y / CHUNK_SIZE;
-                                let final_local_x = p.x % CHUNK_SIZE;
-                                let final_local_y = p.y % CHUNK_SIZE;
-
-                                chunks[final_chunk_y][final_chunk_x].particles[final_local_y][final_local_x] = Some(p);
-                                if moved{
-                                    chunks[chunk_y][chunk_x].is_active = true;
-                                    chunks[final_chunk_y][final_chunk_x].is_active = true;
-                                    if y_local == 0{
-                                        if chunk_y > 0 {chunks[chunk_y - 1][chunk_x].is_active = true;}
-                                    }
-                                    if x_local == 0{
-                                        if chunk_x > 0 {chunks[chunk_y][chunk_x - 1].is_active = true;}
-                                    }
-                                    if x_local == CHUNK_SIZE - 1{
-                                        if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1].is_active = true;}
                                     }
                                 }
                             }
                         }
+                        final_x = p.x;
+                        final_y = p.y;
+                        if let Some(pixel_slice) = image_data.get_mut(previous_x + previous_y * GRID_WIDTH) {
+                            *pixel_slice = [0, 0, 0, 255]; 
+                        }
+                        if let Some(pixel_slice) = image_data.get_mut(final_x + final_y * GRID_WIDTH) {
+                            let (r, g, b) = p.color;
+                            *pixel_slice = [r, g, b, 255]; 
+                        }
+                        
+
+                        if !moved {
+                            p.vy *= 0.7;
+                        } else {
+                            chunks[chunk_y][chunk_x].is_active = true;
+                        }
+
+                        let final_chunk_x = p.x / CHUNK_SIZE;
+                        let final_chunk_y = p.y / CHUNK_SIZE;
+                        let final_local_x = p.x % CHUNK_SIZE;
+                        let final_local_y = p.y % CHUNK_SIZE;
+
+                        chunks[final_chunk_y][final_chunk_x].particles[final_local_y][final_local_x] = Some(p);
+                        if moved{
+                            chunks[chunk_y][chunk_x].is_active = true;
+                            chunks[final_chunk_y][final_chunk_x].is_active = true;
+                            if y_local == 0{
+                                if chunk_y > 0 {chunks[chunk_y - 1][chunk_x].is_active = true;}
+                            }
+                            if x_local == 0{
+                                if chunk_x > 0 {chunks[chunk_y][chunk_x - 1].is_active = true;}
+                            }
+                            if x_local == CHUNK_SIZE - 1{
+                                if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1].is_active = true;}
+                            }
+                        }
                     }
-                    chunks[chunk_y][chunk_x].is_active = still_active;
                 }
             }
         }

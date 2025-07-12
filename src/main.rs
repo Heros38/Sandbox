@@ -16,7 +16,7 @@ const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
 const GRAVITY: f32 = 0.2;
 const FRICTION: f32 = 0.02;
 
-const CHUNK_SIZE: usize = 40;
+const CHUNK_SIZE: usize = 80;
 const CHUNKS_X: usize = GRID_WIDTH / CHUNK_SIZE;
 const CHUNKS_Y: usize = GRID_HEIGHT / CHUNK_SIZE;
 
@@ -54,7 +54,6 @@ struct Particle {
     vy: f32,
     color: (u8, u8, u8),
     lifespan: usize,
-    is_sleeping: bool,
 }
 
 fn create_particle(
@@ -76,7 +75,6 @@ fn create_particle(
         vy,
         color,
         lifespan,
-        is_sleeping: false
     }
 }
 
@@ -127,12 +125,31 @@ fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize
     return points
 }
 
+fn _get_scanline(chunks: &Vec<Vec<Chunk>>, cy: usize, ) -> Vec<Vec<(usize, usize, usize)>> {
+    let mut rng = thread_rng();
+
+    let mut scanlines: Vec<Vec<(usize, usize, usize)>> = vec![vec![]; CHUNK_SIZE];
+
+    for y_local in (0..CHUNK_SIZE).rev(){
+        let mut line: Vec<(usize, usize, usize)> = Vec::new();
+        for cx in 0..CHUNKS_X{
+            let chunk = &chunks[cy][cx];
+            if chunk.is_active {
+                for x_local in 0..CHUNK_SIZE{
+                    line.push((x_local, y_local, cx));
+                }
+            }
+        }
+        line.shuffle(&mut rng);
+        scanlines[y_local] = line;
+    }
+    return scanlines
+}
+
 
 fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
     let mut rng = thread_rng();
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
-
-    
 
     for chunk_y in (0..CHUNKS_Y as usize).rev() { 
         for chunk_x in 0..CHUNKS_X as usize { 
@@ -148,10 +165,6 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                             let y_global = chunk_y * CHUNK_SIZE + y_local;
 
                             if let Some(mut p) = chunks[chunk_y][chunk_x].particles[y_local][x_local].take() {
-                                if p.is_sleeping {
-                                    chunks[chunk_y][chunk_x].particles[y_local][x_local] = Some(p);
-                                    continue;
-                                }
 
                                 let previous_x: usize = x_global;
                                 let previous_y: usize = y_global;
@@ -253,11 +266,7 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
 
                                 if !moved {
                                     p.vy *= 0.7;
-                                    if p.vy.abs() < 0.1 {
-                                    p.is_sleeping = true;
-                                    }
                                 } else {
-                                    p.is_sleeping = false;
                                     still_active = true;
                                 }
 
@@ -267,23 +276,23 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                                 let final_local_y = p.y % CHUNK_SIZE;
 
                                 chunks[final_chunk_y][final_chunk_x].particles[final_local_y][final_local_x] = Some(p);
-
-                                if moved {
-                                    for dx in -1..=1 {
-                                        for dy in -1..=1 {
-                                            let nx = final_chunk_x as isize + dx;
-                                            let ny = final_chunk_y as isize + dy;
-                                            if let Some(chunk) = chunks.get_mut(ny as usize).and_then(|row| row.get_mut(nx as usize)) {
-                                                chunk.is_active = true;
-                                            }
-                                        }
+                                if moved{
+                                    chunks[chunk_y][chunk_x].is_active = true;
+                                    chunks[final_chunk_y][final_chunk_x].is_active = true;
+                                    if y_local == 0{
+                                        if chunk_y > 0 {chunks[chunk_y - 1][chunk_x].is_active = true;}
+                                    }
+                                    if x_local == 0{
+                                        if chunk_x > 0 {chunks[chunk_y][chunk_x - 1].is_active = true;}
+                                    }
+                                    if x_local == CHUNK_SIZE - 1{
+                                        if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1].is_active = true;}
                                     }
                                 }
                             }
                         }
                     }
                     chunks[chunk_y][chunk_x].is_active = still_active;
-
                 }
             }
         }

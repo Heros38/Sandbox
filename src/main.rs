@@ -1,7 +1,7 @@
 use ::rand::Rng;
 use ::rand::seq::SliceRandom;
 use ::rand::thread_rng;
-use macroquad::prelude::*;
+use macroquad::{prelude::*};
 use crate::miniquad::conf::Platform;
 use std::{thread, vec};
 use std::time::{Instant, Duration};
@@ -46,60 +46,30 @@ impl Chunk {
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Particle {
     type_id: usize,
-    x: usize,
-    y: usize,
     tx: f32,
     ty: f32,
     vx: f32,
     vy: f32,
-    color: (u8, u8, u8),
     lifespan: usize,
 }
 
 fn create_particle(
     type_id: usize,
-    x: usize,
-    y: usize,
+    tx: f32 ,
+    ty: f32,
     vx: f32,
     vy: f32,
-    color: (u8, u8, u8),
     lifespan: usize,
 ) -> Particle {
     Particle {
         type_id,
-        x,
-        y,
-        tx: x as f32,
-        ty: y as f32,
+        tx,
+        ty,
         vx,
         vy,
-        color,
         lifespan,
     }
 }
-
-/* 
-def get_line(x0: int, y0: int, x1: int, y1: int):
-    points = []
-    dx = abs(x1 - x0)
-    dy = -abs(y1 - y0)
-    sx = 1 if x0 < x1 else -1
-    sy = 1 if y0 < y1 else -1
-    err = dx + dy
-
-    while True:
-        points.append((x0, y0))
-        if x0 == x1 and y0 == y1:
-            break
-        e2 = 2 * err
-        if e2 >= dy:
-            err += dy
-            x0 += sx
-        if e2 <= dx:
-            err += dx
-            y0 += sy
-    return points
-*/
 
 fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize)>{
     let mut points: Vec<(isize, isize)> = Vec::new();
@@ -221,9 +191,6 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                             }
                         }
                         
-                        p.x = final_x;
-                        p.y = final_y;
-
                         if p.type_id == SAND_ID{
                             if !moved {
                                 let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
@@ -232,8 +199,8 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                                 }
 
                                 for (dx, dy) in diagonal_offsets {
-                                    let target_x_diag_global = p.x as isize + dx;
-                                    let target_y_diag_global = p.y as isize + dy;
+                                    let target_x_diag_global = previous_x as isize + dx;
+                                    let target_y_diag_global = previous_y as isize + dy;
 
                                     if target_x_diag_global >= 0 && target_x_diag_global < GRID_WIDTH as isize &&
                                     target_y_diag_global >= 0 && target_y_diag_global < GRID_HEIGHT as isize {
@@ -244,10 +211,10 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                                         let target_local_y = target_y_diag_global as usize % CHUNK_SIZE;
                                         
                                         if chunks[target_chunk_y][target_chunk_x].particles[target_local_y][target_local_x].is_none() {
-                                            p.x = target_x_diag_global as usize;
-                                            p.y = target_y_diag_global as usize;
-                                            p.tx = p.x as f32;
-                                            p.ty = p.y as f32;
+                                            final_x = target_x_diag_global as usize;
+                                            final_y = target_y_diag_global as usize;
+                                            p.tx = final_x as f32;
+                                            p.ty = final_y as f32;
                                             moved = true;
                                             break;
                                         }
@@ -255,16 +222,14 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                                 }
                             }
                         }
-                        final_x = p.x;
-                        final_y = p.y;
                         if let Some(pixel_slice) = image_data.get_mut(previous_x + previous_y * GRID_WIDTH) {
+                            let particle_color = *pixel_slice;
                             *pixel_slice = [0, 0, 0, 255]; 
+                            if let Some(pixel_slice) = image_data.get_mut(final_x + final_y * GRID_WIDTH) {
+                                *pixel_slice = [particle_color[0], particle_color[1], particle_color[2], 255]; 
+                            }
                         }
-                        if let Some(pixel_slice) = image_data.get_mut(final_x + final_y * GRID_WIDTH) {
-                            let (r, g, b) = p.color;
-                            *pixel_slice = [r, g, b, 255]; 
-                        }
-                        
+
 
                         if !moved {
                             p.vy *= 0.7;
@@ -272,10 +237,10 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                             chunks[chunk_y][chunk_x].is_active = true;
                         }
 
-                        let final_chunk_x = p.x / CHUNK_SIZE;
-                        let final_chunk_y = p.y / CHUNK_SIZE;
-                        let final_local_x = p.x % CHUNK_SIZE;
-                        let final_local_y = p.y % CHUNK_SIZE;
+                        let final_chunk_x = final_x / CHUNK_SIZE;
+                        let final_chunk_y = final_y / CHUNK_SIZE;
+                        let final_local_x = final_x % CHUNK_SIZE;
+                        let final_local_y = final_y % CHUNK_SIZE;
 
                         chunks[final_chunk_y][final_chunk_x].particles[final_local_y][final_local_x] = Some(p);
                         if moved{
@@ -298,46 +263,6 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
     }
 }
 
-
-fn _draw_screen(image: &mut Image, texture: &mut Texture2D, chunks: &Vec<Vec<Chunk>>) {
-    let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
-
-    for cx in 0..CHUNKS_X {
-        for cy in 0..CHUNKS_Y {
-            let chunk = &chunks[cy][cx];
-            if chunk.is_active{
-                for lx in 0..CHUNK_SIZE {
-                    for ly in 0..CHUNK_SIZE {
-                        let gx = cx * CHUNK_SIZE + lx;
-                        let gy = cy * CHUNK_SIZE + ly;
-                        let pixel_index = gy * GRID_WIDTH + gx;
-
-                        if let Some(pixel_slice) = image_data.get_mut(pixel_index) {
-                            if let Some(current_particle) = chunk.particles[ly][lx] {
-                                let (r, g, b) = current_particle.color;
-                                *pixel_slice = [r, g, b, 255]; 
-                            } else {
-                                *pixel_slice = [0, 0, 0, 255]; 
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    /*
-    for (x, y) in particles_to_clear {
-        image.set_pixel(*x as u32, *y as u32, BLACK);
-        //draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, BLACK);
-        //println!("particle cleared at {x} {y}");
-    }
-    for (x, y, (r, g, b)) in particles_to_draw {
-        image.set_pixel(*x as u32, *y as u32, Color::from_rgba(*r, *g, *b, 255));
-        //draw_rectangle((*x * CELL_SIZE) as f32, (*y * CELL_SIZE) as f32, CELL_SIZE as f32, CELL_SIZE as f32, Color::from_rgba(*r, *g, *b, 255))
-    }
-     */
-    texture.update(image);
-}
 
 fn window_conf() -> Conf {
     Conf {
@@ -383,11 +308,10 @@ fn handle_mouse_input(chunks: &mut Vec<Vec<Chunk>>, previous_pos: &mut (isize, i
                                     }
                                     let new_sand_particle = create_particle(
                                         SAND_ID,
-                                        target_grid_x as usize,
-                                        target_grid_y as usize,
+                                        target_grid_x as f32,
+                                        target_grid_y as f32,
                                         0.0,    
                                         1.0,
-                                        color,
                                         0,
                                     );
                                     chunks[chunk_y][chunk_x].particles[local_y][local_x] = Some(new_sand_particle);
@@ -454,9 +378,7 @@ async fn main() {
         
         handle_mouse_input(&mut chunks, &mut previous_pos, &mut game_image);
         
-        //let start_draw_time = Instant::now();
         game_texture.update(&game_image);
-        //draw_screen(&mut game_image, &mut game_texture, &chunks);
         draw_texture_ex(
             &game_texture, 
             0.0,
@@ -486,8 +408,6 @@ async fn main() {
                 }
             }
         }
-        //let end_draw_time = Instant::now();
-        //println!("draw time: {}", end_draw_time.duration_since(start_draw_time).as_millis());
         let end_time: Instant = Instant::now();
         let sleep_duration_ms = 1000.0 / 60.0 - end_time.duration_since(start_time).as_millis() as f32;
 

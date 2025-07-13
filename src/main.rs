@@ -71,8 +71,9 @@ fn create_particle(
     }
 }
 
-fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize)>{
-    let mut points: Vec<(isize, isize)> = Vec::new();
+#[inline]
+fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize, buffer: &mut Vec<(isize, isize)>){
+    buffer.clear();
     let dx: isize = (x1 - x0).abs();
     let dy: isize = -(y1 - y0).abs();
     let sx = if x0 < x1 { 1 } else { -1 };
@@ -80,7 +81,7 @@ fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize
     let mut err = dx + dy;
 
     loop{
-        points.push((x0, y0));
+        buffer.push((x0, y0));
         if x0 == x1 && y0 == y1{break}
         let e2 = 2 * err;
         if e2 >= dy{
@@ -92,34 +93,33 @@ fn get_line(mut x0:isize, mut y0:isize, x1:isize, y1:isize) -> Vec<(isize, isize
             y0 += sy;
         }
     }
-    return points
 }
 
-fn get_scanline(chunks: &Vec<Vec<Chunk>>, cy: usize, ) -> Vec<Vec<(usize, usize)>> {
-    let mut rng = thread_rng();
-    let mut scanlines: Vec<Vec<(usize, usize)>> = vec![vec![]; CHUNK_SIZE];
+#[inline]
+fn get_scanline(chunks: &Vec<Vec<Chunk>>, cy: usize, scanlines: &mut Vec<Vec<(usize, usize)>>, rng: &mut ::rand::prelude::ThreadRng){
 
     for y_local in (0..CHUNK_SIZE).rev(){
-        let mut line: Vec<(usize, usize)> = Vec::new();
+        let line: &mut Vec<(usize, usize)> = &mut scanlines[y_local];
+        line.clear(); 
         for cx in 0..CHUNKS_X{
-            let chunk = &chunks[cy][cx];
-            if chunk.is_active {
+            let chunk = &chunks[cy][cx];    
+            if chunk.is_active {    
                 line.push((cx * CHUNK_SIZE, (cx+1) * CHUNK_SIZE));
             }
         }
-        line.shuffle(&mut rng);
-        scanlines[y_local] = line;
+        line.shuffle(rng);
     }
-    return scanlines
 }
 
 
 fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
-    let mut rng = thread_rng();
+    let mut rng: ::rand::prelude::ThreadRng = thread_rng();
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
+    let mut path_buffer: Vec<(isize, isize)> =  Vec::new();
+    let mut scanlines_buffer: Vec<Vec<(usize, usize)>> = vec![vec![]; CHUNK_SIZE];
 
     for chunk_y in (0..CHUNKS_Y as usize).rev() { 
-        let scanlines = get_scanline(chunks, chunk_y);
+        get_scanline(chunks, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
         for cx in 0..CHUNKS_X {
             let chunk = &mut chunks[chunk_y][cx];
             chunk.is_active = false;
@@ -128,7 +128,7 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
         for y_local in (0..CHUNK_SIZE).rev() {
             let y_global = chunk_y * CHUNK_SIZE + y_local;
 
-            let lines = &scanlines[y_local]; 
+            let lines = &scanlines_buffer[y_local]; 
             for chunk_line in lines {
                 let mut row_x_indices: Vec<usize> = (chunk_line.0..chunk_line.1).collect();
                 row_x_indices.shuffle(&mut rng);
@@ -156,11 +156,11 @@ fn update_particles(chunks: &mut Vec<Vec<Chunk>>, image: &mut Image) {
                         let target_tx = p.tx + p.vx;
                         let target_ty = p.ty + p.vy;
 
-                        let path = get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize);
+                        get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize, &mut path_buffer); // directly modify path
 
                         let mut collision: bool = false;
 
-                        for (nx, ny) in path.clone().into_iter().skip(1){
+                        for (nx, ny) in path_buffer.clone().into_iter().skip(1){
                             if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
                                 collision = true;
                                 break
@@ -280,13 +280,15 @@ fn window_conf() -> Conf {
 
 fn handle_mouse_input(chunks: &mut Vec<Vec<Chunk>>, previous_pos: &mut (isize, isize), image: &mut Image){
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
+    let mut path_buffer: Vec<(isize, isize)> =  Vec::new();
     if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Right){
         let (mouse_x, mouse_y) = mouse_position();
         let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
         let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
-        let radius = 10;
+        let radius = 20;
         if previous_pos.0 != -1{
-            for (x, y) in get_line(previous_pos.0, previous_pos.1, grid_x, grid_y){
+            get_line(previous_pos.0, previous_pos.1, grid_x, grid_y, &mut path_buffer);
+            for (x, y) in path_buffer{
                 if is_mouse_button_down(MouseButton::Left) {
                     for dx in -radius..=radius {
                         for dy in -radius..=radius {

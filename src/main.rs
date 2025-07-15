@@ -9,6 +9,11 @@ use std::time::{Instant, Duration};
 
 const SAND_ID: usize = 1;
 const WATER_ID: usize = 2;
+const STONE_ID: usize = 3;
+const _CHROMATIC_ID: usize = 4;
+const _STEAM_ID: usize = 5;
+const _FIRE_ID: usize = 6;
+const _WOOD_ID: usize = 7;
 const SCREEN_WIDTH: usize = 1600;
 const SCREEN_HEIGHT: usize = 800;
 const CELL_SIZE: usize = 2;
@@ -36,7 +41,7 @@ const WATER_COLORS: [(u8, u8, u8); 3] = [
     (25, 25, 112)
 ];
 
-const _STONE_COLORS: [(u8, u8, u8); 4] = [
+const STONE_COLORS: [(u8, u8, u8); 4] = [
     (190, 200, 205),
     (140, 150, 155),
     (90, 100, 105),
@@ -183,75 +188,109 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                 for x_global in row_x_indices {
                     let x_local = x_global % CHUNK_SIZE;
                     if let Some(mut p) = grid[y_global][x_global].take() {
+                        if p.type_id == SAND_ID || p.type_id == WATER_ID{
+                            let previous_x: usize = x_global;
+                            let previous_y: usize = y_global;
+                            let mut final_x: usize = x_global;
+                            let mut final_y: usize = y_global;
+                            let mut moved = false;
 
-                        let previous_x: usize = x_global;
-                        let previous_y: usize = y_global;
-                        let mut final_x: usize = x_global;
-                        let mut final_y: usize = y_global;
-                        let mut moved = false;
-
-                        let v2: f32 = p.vx*p.vx + p.vy*p.vy;
-                        if v2 > 0.0001{
-                            let v: f32 = v2.sqrt();
-                            let damping: f32 = 1.0 - FRICTION * v;
-                            p.vx *= damping;
-                            p.vy = GRAVITY + damping * p.vy
-                        } else{
-                            p.vy = GRAVITY
-                        }
-                        let target_tx = p.tx + p.vx;
-                        let target_ty = p.ty + p.vy;
-
-                        get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize, &mut path_buffer); // directly modify path
-
-                        let mut collision: bool = false;
-
-                        for &(nx, ny) in path_buffer.iter().skip(1){
-                            if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
-                                collision = true;
-                                break
+                            let v2: f32 = p.vx*p.vx + p.vy*p.vy;
+                            if v2 > 0.0001{
+                                let v: f32 = v2.sqrt();
+                                let damping: f32 = 1.0 - FRICTION * v;
+                                p.vx *= damping;
+                                p.vy = GRAVITY + damping * p.vy
+                            } else{
+                                p.vy = GRAVITY
                             }
-                            if grid[ny as usize][nx as usize].is_none(){
-                                final_x = nx as usize;
-                                final_y = ny as usize;
-                            } 
-                            else if let Some(checked_cell) = &grid[ny as usize][nx as usize] {
-                                if p.type_id == SAND_ID && checked_cell.type_id == WATER_ID { 
+                            let target_tx = p.tx + p.vx;
+                            let target_ty = p.ty + p.vy;
+
+                            get_line(p.tx.round() as isize, p.ty.round() as isize, target_tx.round() as isize, target_ty.round() as isize, &mut path_buffer); // directly modify path
+
+                            let mut collision: bool = false;
+
+                            for &(nx, ny) in path_buffer.iter().skip(1){
+                                if !(0 <= nx && nx < GRID_WIDTH as isize && 0 <= ny && ny < GRID_HEIGHT as isize){
+                                    collision = true;
+                                    break
+                                }
+                                if grid[ny as usize][nx as usize].is_none(){
                                     final_x = nx as usize;
                                     final_y = ny as usize;
+                                } 
+                                else if let Some(checked_cell) = &grid[ny as usize][nx as usize] {
+                                    if p.type_id == SAND_ID && checked_cell.type_id == WATER_ID { 
+                                        final_x = nx as usize;
+                                        final_y = ny as usize;
+                                    }
+                                } 
+                                
+                                else{
+                                    collision = true;
+                                    break
                                 }
-                            } 
-                            
-                            else{
-                                collision = true;
-                                break
                             }
-                        }
-                        if previous_x != final_x || previous_y != final_y{
-                            moved = true;
-                            if collision{
-                                p.tx = final_x as f32;
-                                p.ty = final_y as f32;
-                                p.vx = 0.0;
-                                p.vy = 0.0;
+                            if previous_x != final_x || previous_y != final_y{
+                                moved = true;
+                                if collision{
+                                    p.tx = final_x as f32;
+                                    p.ty = final_y as f32;
+                                    p.vx = 0.0;
+                                    p.vy = 0.0;
 
-                            } else{
-                                if grid[final_y][final_x].is_none(){
-                                    p.tx = target_tx;
-                                    p.ty = target_ty;
-                                }
-                                else{ // swap between sand and water
-                                    p.tx = target_tx;
-                                    p.ty = target_ty;
-                                    p.vx *= 0.6;
-                                    p.vy *= 0.6;
-                                    grid[previous_y][previous_x] = grid[final_y as usize][final_x as usize].take();
+                                } else{
+                                    if grid[final_y][final_x].is_none(){
+                                        p.tx = target_tx;
+                                        p.ty = target_ty;
+                                    }
+                                    else{ // swap between sand and water
+                                        p.tx = target_tx;
+                                        p.ty = target_ty;
+                                        p.vx *= 0.6;
+                                        p.vy *= 0.6;
+                                        grid[previous_y][previous_x] = grid[final_y as usize][final_x as usize].take();
+                                    }
                                 }
                             }
-                        }
-                        
-                        if p.type_id == SAND_ID{ // diagonals
-                            if !moved {
+                            
+                            if p.type_id == SAND_ID{ // diagonals
+                                if !moved {
+                                    let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
+                                    if rng.gen_bool(0.5) {
+                                        diagonal_offsets.reverse();
+                                    }
+
+                                    for (dx, dy) in diagonal_offsets {
+                                        let target_x = previous_x as isize + dx;
+                                        let target_y = previous_y as isize + dy;
+
+                                        if target_x >= 0 && target_x < GRID_WIDTH as isize &&
+                                        target_y >= 0 && target_y < GRID_HEIGHT as isize {
+                                            
+                                            if grid[target_y as usize][target_x as usize].is_none() {
+                                                final_x = target_x as usize;
+                                                final_y = target_y as usize;
+                                                p.tx = final_x as f32;
+                                                p.ty = final_y as f32;
+                                                moved = true;
+                                                break;
+                                            } else if let Some(checked_cell) = &grid[target_y as usize][target_x as usize] && checked_cell.type_id == WATER_ID{
+                                                final_x = target_x as usize;
+                                                final_y = target_y as usize;
+                                                p.tx = final_x as f32;
+                                                p.ty = final_y as f32;
+                                                moved = true;
+                                                grid[previous_y][previous_x] = grid[final_y as usize][final_x as usize].take();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            if p.type_id == WATER_ID && !moved{ // water diags and spread
                                 let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
                                 if rng.gen_bool(0.5) {
                                     diagonal_offsets.reverse();
@@ -271,91 +310,61 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                             p.ty = final_y as f32;
                                             moved = true;
                                             break;
-                                        } else if let Some(checked_cell) = &grid[target_y as usize][target_x as usize] && checked_cell.type_id == WATER_ID{
-                                            final_x = target_x as usize;
-                                            final_y = target_y as usize;
-                                            p.tx = final_x as f32;
-                                            p.ty = final_y as f32;
-                                            moved = true;
-                                            grid[previous_y][previous_x] = grid[final_y as usize][final_x as usize].take();
-                                            break;
                                         }
                                     }
                                 }
-                            }
-                        }
-                        
-                        if p.type_id == WATER_ID && !moved{ // water diags and spread
-                            let mut diagonal_offsets: Vec<(isize, isize)> = vec![(-1, 1), (1, 1)];
-                            if rng.gen_bool(0.5) {
-                                diagonal_offsets.reverse();
-                            }
-
-                            for (dx, dy) in diagonal_offsets {
-                                let target_x = previous_x as isize + dx;
-                                let target_y = previous_y as isize + dy;
-
-                                if target_x >= 0 && target_x < GRID_WIDTH as isize &&
-                                target_y >= 0 && target_y < GRID_HEIGHT as isize {
-                                    
-                                    if grid[target_y as usize][target_x as usize].is_none() {
-                                        final_x = target_x as usize;
-                                        final_y = target_y as usize;
-                                        p.tx = final_x as f32;
-                                        p.ty = final_y as f32;
-                                        moved = true;
-                                        break;
-                                    }
-                                }
-                            }
-                            if !moved{
-                                let mut direction:isize = if rng.gen_bool(0.5) {1} else {-1};  
-                                for _ in 0..2{
-                                    if moved {break}
-                                    for dx in 1..MAX_SPREAD_DIST{
-                                        let current_x:isize = previous_x as isize + dx as isize * direction;
-                                        if current_x < GRID_WIDTH as isize && current_x >= 0 && grid[previous_y][current_x as usize].is_none(){ 
-                                            final_x = current_x as usize;
-                                            moved = true;
+                                if !moved{
+                                    let mut direction:isize = if rng.gen_bool(0.5) {1} else {-1};  
+                                    for _ in 0..2{
+                                        if moved {break}
+                                        for dx in 1..MAX_SPREAD_DIST{
+                                            let current_x:isize = previous_x as isize + dx as isize * direction;
+                                            if current_x < GRID_WIDTH as isize && current_x >= 0 && grid[previous_y][current_x as usize].is_none(){ 
+                                                final_x = current_x as usize;
+                                                moved = true;
+                                            }
                                         }
+                                        direction *= -1;
                                     }
-                                    direction *= -1;
                                 }
                             }
+                            
+                            if !moved {
+                                p.vy *= 0.7;
+                            } else {
+                                chunks[chunk_y][chunk_x] = true;
+                            }
+
+                            let final_chunk_x = final_x / CHUNK_SIZE;
+                            let final_chunk_y = final_y / CHUNK_SIZE;
+
+                            grid[final_y][final_x] = Some(p);
+                            if moved{
+                                chunks[chunk_y][chunk_x] = true;
+                                chunks[final_chunk_y][final_chunk_x] = true;
+                                if y_local == 0{
+                                    if chunk_y > 0 {chunks[chunk_y - 1][chunk_x] = true;}
+                                }
+                                if x_local == 0{
+                                    if chunk_x > 0 {chunks[chunk_y][chunk_x - 1] = true;}
+                                }
+                                if x_local == CHUNK_SIZE - 1{
+                                    if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1] = true;}
+                                }
+                                let idx1 = previous_x + previous_y * GRID_WIDTH;
+                                let idx2 = final_x + final_y * GRID_WIDTH;
+                                let (first_idx, second_idx) = if idx1 < idx2 { (idx1, idx2) } else { (idx2, idx1) };
+
+                                let (left_slice, right_slice_starting_at_second_idx) = image_data.split_at_mut(second_idx);
+
+                                let pixel1 = &mut left_slice[first_idx]; 
+                                let pixel2 = &mut right_slice_starting_at_second_idx[0]; 
+
+                                std::mem::swap(pixel1, pixel2);
+                            }
                         }
-                        
-                        if !moved {
-                            p.vy *= 0.7;
-                        } else {
-                            chunks[chunk_y][chunk_x] = true;
-                        }
-
-                        let final_chunk_x = final_x / CHUNK_SIZE;
-                        let final_chunk_y = final_y / CHUNK_SIZE;
-
-                        grid[final_y][final_x] = Some(p);
-                        if moved{
-                            chunks[chunk_y][chunk_x] = true;
-                            chunks[final_chunk_y][final_chunk_x] = true;
-                            if y_local == 0{
-                                if chunk_y > 0 {chunks[chunk_y - 1][chunk_x] = true;}
-                            }
-                            if x_local == 0{
-                                if chunk_x > 0 {chunks[chunk_y][chunk_x - 1] = true;}
-                            }
-                            if x_local == CHUNK_SIZE - 1{
-                                if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1] = true;}
-                            }
-                            let idx1 = previous_x + previous_y * GRID_WIDTH;
-                            let idx2 = final_x + final_y * GRID_WIDTH;
-                            let (first_idx, second_idx) = if idx1 < idx2 { (idx1, idx2) } else { (idx2, idx1) };
-
-                            let (left_slice, right_slice_starting_at_second_idx) = image_data.split_at_mut(second_idx);
-
-                            let pixel1 = &mut left_slice[first_idx]; 
-                            let pixel2 = &mut right_slice_starting_at_second_idx[0]; 
-
-                            std::mem::swap(pixel1, pixel2);
+                        else{
+                            grid[y_global][x_global] = Some(p);
                         }
                     }
                 }
@@ -429,6 +438,21 @@ fn handle_mouse_input(chunks: &mut Vec<Vec<bool>>, previous_pos: &mut (isize, is
                                             0,
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                    } 
+                                    else if *current_particle_type == STONE_ID{
+                                        let (r, g, b) = *STONE_COLORS.choose(&mut thread_rng()).unwrap();
+                                        if let Some(pixel_slice) = image_data.get_mut(target_grid_x as usize + target_grid_y as usize * GRID_WIDTH) {
+                                            *pixel_slice = [r, g, b, 255]; 
+                                        }
+                                        let new_particle = create_particle(
+                                            STONE_ID,
+                                            target_grid_x as f32,
+                                            target_grid_y as f32,
+                                            0.0,    
+                                            0.0,
+                                            0,
+                                        );
+                                        grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
                                     }
                                     chunks[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                 }
@@ -469,6 +493,9 @@ fn handle_keyboard_input(current_particle_type: &mut usize){
     }
     else if is_key_pressed(KeyCode::Key2){
         *current_particle_type = WATER_ID;
+    }
+    else if is_key_pressed(KeyCode::Key3){
+        *current_particle_type = STONE_ID;
     }
 }
 

@@ -10,9 +10,9 @@ use std::time::{Instant, Duration};
 const SAND_ID: usize = 1;
 const WATER_ID: usize = 2;
 const STONE_ID: usize = 3;
-const _CHROMATIC_ID: usize = 4;
+const _FIRE_ID: usize = 4;
 const _STEAM_ID: usize = 5;
-const _FIRE_ID: usize = 6;
+const _CHROMATIC_ID: usize = 6;
 const _WOOD_ID: usize = 7;
 const SCREEN_WIDTH: usize = 1600;
 const SCREEN_HEIGHT: usize = 800;
@@ -163,6 +163,50 @@ fn get_scanline(chunks: &Vec<Vec<bool>>, cy: usize, scanlines: &mut Vec<Vec<(usi
     }
 }
 
+#[inline]
+fn apply_gravity(p: &mut Particle, ){
+    let v2: f32 = p.vx*p.vx + p.vy*p.vy;
+    if v2 > 0.0001{
+        let v: f32 = v2.sqrt();
+        let damping: f32 = 1.0 - FRICTION * v;
+        p.vx *= damping;
+        p.vy = GRAVITY + damping * p.vy
+    } else{
+        p.vy = GRAVITY
+    }
+}
+
+#[inline]
+fn draw_movment_and_activate_chunks(chunks: &mut Vec<Vec<bool>>, image_data: &mut [[u8; 4]], previous_x: usize, previous_y: usize, final_x: usize, final_y: usize, chunk_x: usize, chunk_y:usize){
+    let final_chunk_x = final_x / CHUNK_SIZE;
+    let final_chunk_y = final_y / CHUNK_SIZE;
+    let x_local = previous_x % CHUNK_SIZE;
+    let y_local = previous_y % CHUNK_SIZE;
+    chunks[chunk_y][chunk_x] = true;
+    chunks[final_chunk_y][final_chunk_x] = true;
+
+    if y_local == 0{
+        if chunk_y > 0 {chunks[chunk_y - 1][chunk_x] = true;}
+    }
+    if x_local == 0{
+        if chunk_x > 0 {chunks[chunk_y][chunk_x - 1] = true;}
+    }
+    if x_local == CHUNK_SIZE - 1{
+        if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1] = true;}
+    }
+    let idx1 = previous_x + previous_y * GRID_WIDTH;
+    let idx2 = final_x + final_y * GRID_WIDTH;
+    let (first_idx, second_idx) = if idx1 < idx2 { (idx1, idx2) } else { (idx2, idx1) };
+
+    let (left_slice, right_slice_starting_at_second_idx) = image_data.split_at_mut(second_idx);
+
+    let pixel1 = &mut left_slice[first_idx]; 
+    let pixel2 = &mut right_slice_starting_at_second_idx[0]; 
+
+    std::mem::swap(pixel1, pixel2);
+
+}
+
 
 fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut Vec<Vec<Option<Particle>>>) {
     let mut rng: ::rand::prelude::ThreadRng = thread_rng();
@@ -186,7 +230,6 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                 let chunk_x = chunk_line.0 / CHUNK_SIZE;
 
                 for x_global in row_x_indices {
-                    let x_local = x_global % CHUNK_SIZE;
                     if let Some(mut p) = grid[y_global][x_global].take() {
                         if p.type_id == SAND_ID || p.type_id == WATER_ID{
                             let previous_x: usize = x_global;
@@ -195,15 +238,8 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                             let mut final_y: usize = y_global;
                             let mut moved = false;
 
-                            let v2: f32 = p.vx*p.vx + p.vy*p.vy;
-                            if v2 > 0.0001{
-                                let v: f32 = v2.sqrt();
-                                let damping: f32 = 1.0 - FRICTION * v;
-                                p.vx *= damping;
-                                p.vy = GRAVITY + damping * p.vy
-                            } else{
-                                p.vy = GRAVITY
-                            }
+                            apply_gravity(&mut p);
+
                             let target_tx = p.tx + p.vx;
                             let target_ty = p.ty + p.vy;
 
@@ -329,39 +365,12 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                 }
                             }
                             
-                            if !moved {
-                                p.vy *= 0.7;
+                            if moved {
+                                draw_movment_and_activate_chunks(chunks, image_data, previous_x , previous_y, final_x, final_y, chunk_x, chunk_y)
                             } else {
-                                chunks[chunk_y][chunk_x] = true;
+                                p.vy *= 0.7;
                             }
-
-                            let final_chunk_x = final_x / CHUNK_SIZE;
-                            let final_chunk_y = final_y / CHUNK_SIZE;
-
                             grid[final_y][final_x] = Some(p);
-                            if moved{
-                                chunks[chunk_y][chunk_x] = true;
-                                chunks[final_chunk_y][final_chunk_x] = true;
-                                if y_local == 0{
-                                    if chunk_y > 0 {chunks[chunk_y - 1][chunk_x] = true;}
-                                }
-                                if x_local == 0{
-                                    if chunk_x > 0 {chunks[chunk_y][chunk_x - 1] = true;}
-                                }
-                                if x_local == CHUNK_SIZE - 1{
-                                    if chunk_x < CHUNKS_X - 1 {chunks[chunk_y][chunk_x + 1] = true;}
-                                }
-                                let idx1 = previous_x + previous_y * GRID_WIDTH;
-                                let idx2 = final_x + final_y * GRID_WIDTH;
-                                let (first_idx, second_idx) = if idx1 < idx2 { (idx1, idx2) } else { (idx2, idx1) };
-
-                                let (left_slice, right_slice_starting_at_second_idx) = image_data.split_at_mut(second_idx);
-
-                                let pixel1 = &mut left_slice[first_idx]; 
-                                let pixel2 = &mut right_slice_starting_at_second_idx[0]; 
-
-                                std::mem::swap(pixel1, pixel2);
-                            }
                         }
                         else{
                             grid[y_global][x_global] = Some(p);
@@ -370,6 +379,43 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                 }
             }
         }
+    }
+    /* 
+    for chunk_y in (0..CHUNKS_Y as usize) {  // iterates downward
+        get_scanline(chunks, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
+        for cx in 0..CHUNKS_X {
+            chunks[chunk_y][cx] = false;
+        }
+
+        for y_local in (0..CHUNK_SIZE).rev() {
+            let y_global = chunk_y * CHUNK_SIZE + y_local;
+
+            let lines: &Vec<(usize, usize)> = &scanlines_buffer[y_local]; 
+            for chunk_line in lines {
+                let mut row_x_indices: Vec<usize> = (chunk_line.0..chunk_line.1).collect();
+                row_x_indices.shuffle(&mut rng);
+                let chunk_x = chunk_line.0 / CHUNK_SIZE;
+
+                for x_global in row_x_indices {
+                    let x_local = x_global % CHUNK_SIZE;
+                    if let Some(mut p) = grid[y_global][x_global].take() {
+                        // FIRE PARTICLES LOGIC
+                        if p.type_id == FIRE_ID{
+                            if p.lifespan == 0{ // kill the particle
+                                
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    */
+}
+
+fn _update_fire_particle(p: &mut Particle){
+    if p.lifespan == 0{ // kill the particle
+        return 
     }
 }
 

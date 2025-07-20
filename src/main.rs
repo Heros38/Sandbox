@@ -10,13 +10,13 @@ use std::time::{Instant, Duration};
 const SAND_ID: usize = 1;
 const WATER_ID: usize = 2;
 const STONE_ID: usize = 3;
-const _FIRE_ID: usize = 4;
+const FIRE_ID: usize = 4;
 const _STEAM_ID: usize = 5;
 const _CHROMATIC_ID: usize = 6;
 const _WOOD_ID: usize = 7;
 const SCREEN_WIDTH: usize = 1600;
 const SCREEN_HEIGHT: usize = 800;
-const CELL_SIZE: usize = 2;
+const CELL_SIZE: usize = 5;
 const GRID_WIDTH: usize = SCREEN_WIDTH / CELL_SIZE;
 const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
 const GRAVITY: f32 = 0.2;
@@ -26,7 +26,6 @@ const MAX_SPREAD_DIST: usize = 8;
 const CHUNK_SIZE: usize = 40;
 const CHUNKS_X: usize = GRID_WIDTH / CHUNK_SIZE;
 const CHUNKS_Y: usize = GRID_HEIGHT / CHUNK_SIZE;
-
 
 const SAND_COLORS: [(u8, u8, u8); 4] = [
     (210, 180, 140),
@@ -64,7 +63,7 @@ const _STEAM_COLORS: [(u8, u8, u8); 4] = [
     (195, 195, 195)
 ];
 
-const _FIRE_COLORS: [(u8, u8, u8); 4] = [
+const FIRE_COLORS: [(u8, u8, u8); 4] = [
     (255, 255, 102),
     (255, 204, 0),
     (255, 102, 0),
@@ -208,16 +207,16 @@ fn draw_movment_and_activate_chunks(chunks: &mut Vec<Vec<bool>>, image_data: &mu
 }
 
 
-fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut Vec<Vec<Option<Particle>>>) {
+fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut Vec<Vec<Option<Particle>>>, chunks_up: &mut Vec<Vec<bool>>) {
     let mut rng: ::rand::prelude::ThreadRng = thread_rng();
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
     let mut path_buffer: Vec<(isize, isize)> =  Vec::new();
     let mut scanlines_buffer: Vec<Vec<(usize, usize)>> = vec![vec![]; CHUNK_SIZE];
 
     for chunk_y in (0..CHUNKS_Y as usize).rev() { 
-        get_scanline(chunks, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
+        get_scanline(chunks_down, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
         for cx in 0..CHUNKS_X {
-            chunks[chunk_y][cx] = false;
+            chunks_down[chunk_y][cx] = false;
         }
 
         for y_local in (0..CHUNK_SIZE).rev() {
@@ -260,13 +259,14 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                     if p.type_id == SAND_ID && checked_cell.type_id == WATER_ID { 
                                         final_x = nx as usize;
                                         final_y = ny as usize;
+
                                     }
+                                    else{
+                                        collision = true;
+                                        break
+                                }
                                 } 
                                 
-                                else{
-                                    collision = true;
-                                    break
-                                }
                             }
                             if previous_x != final_x || previous_y != final_y{
                                 moved = true;
@@ -305,7 +305,7 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                         if target_x >= 0 && target_x < GRID_WIDTH as isize &&
                                         target_y >= 0 && target_y < GRID_HEIGHT as isize {
                                             
-                                            if grid[target_y as usize][target_x as usize].is_none() {
+                                            if grid[target_y as usize][target_x as usize].is_none() && (grid[previous_y as usize][target_x as usize].is_none() || grid[target_y as usize][previous_x as usize].is_none()){ // TODO: NEEDS TO CHECK FOR STONE 
                                                 final_x = target_x as usize;
                                                 final_y = target_y as usize;
                                                 p.tx = final_x as f32;
@@ -339,7 +339,7 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                     if target_x >= 0 && target_x < GRID_WIDTH as isize &&
                                     target_y >= 0 && target_y < GRID_HEIGHT as isize {
                                         
-                                        if grid[target_y as usize][target_x as usize].is_none() {
+                                        if grid[target_y as usize][target_x as usize].is_none() && ((grid[previous_y as usize][target_x as usize].is_none()) || grid[target_y as usize][previous_x as usize].is_none()) { // TODO: NEEDS TO CHECK FOR STONE 
                                             final_x = target_x as usize;
                                             final_y = target_y as usize;
                                             p.tx = final_x as f32;
@@ -359,6 +359,9 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                                                 final_x = current_x as usize;
                                                 moved = true;
                                             }
+                                            else{
+                                                break
+                                            }
                                         }
                                         direction *= -1;
                                     }
@@ -366,13 +369,16 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                             }
                             
                             if moved {
-                                draw_movment_and_activate_chunks(chunks, image_data, previous_x , previous_y, final_x, final_y, chunk_x, chunk_y)
+                                draw_movment_and_activate_chunks(chunks_down, image_data, previous_x , previous_y, final_x, final_y, chunk_x, chunk_y)
                             } else {
                                 p.vy *= 0.7;
                             }
                             grid[final_y][final_x] = Some(p);
                         }
                         else{
+                            if p.type_id == FIRE_ID{
+                                chunks_down[chunk_y][chunk_x] = true;
+                            }
                             grid[y_global][x_global] = Some(p);
                         }
                     }
@@ -380,15 +386,16 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
             }
         }
     }
-    /* 
-    for chunk_y in (0..CHUNKS_Y as usize) {  // iterates downward
-        get_scanline(chunks, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
+    
+    for chunk_y in 0..CHUNKS_Y as usize {  // iterates downward
+        get_scanline(chunks_up, chunk_y, &mut scanlines_buffer, &mut rng); // directly modify scanlines
         for cx in 0..CHUNKS_X {
-            chunks[chunk_y][cx] = false;
+            chunks_up[chunk_y][cx] = false;
         }
 
-        for y_local in (0..CHUNK_SIZE).rev() {
-            let y_global = chunk_y * CHUNK_SIZE + y_local;
+        for y_local in 0..CHUNK_SIZE {
+            let previous_y = chunk_y * CHUNK_SIZE + y_local;
+            let mut final_y = previous_y;
 
             let lines: &Vec<(usize, usize)> = &scanlines_buffer[y_local]; 
             for chunk_line in lines {
@@ -396,27 +403,59 @@ fn update_particles(chunks: &mut Vec<Vec<bool>>, image: &mut Image, grid: &mut V
                 row_x_indices.shuffle(&mut rng);
                 let chunk_x = chunk_line.0 / CHUNK_SIZE;
 
-                for x_global in row_x_indices {
-                    let x_local = x_global % CHUNK_SIZE;
-                    if let Some(mut p) = grid[y_global][x_global].take() {
+                for previous_x in row_x_indices {
+                    let mut final_x = previous_x;
+                    if let Some(mut p) = grid[previous_y][previous_x].take() {
                         // FIRE PARTICLES LOGIC
+                        //println!("take a particle");
                         if p.type_id == FIRE_ID{
+                            chunks_up[chunk_y][chunk_x] = true;
                             if p.lifespan == 0{ // kill the particle
-                                
+                                if let Some(pixel_slice) = image_data.get_mut(previous_x + previous_y * GRID_WIDTH) {
+                                    *pixel_slice = [0, 0, 0, 255];
+                                }
+                                //println!("clear pixel")
+                            } 
+                            else{
+                                p.lifespan -= 1;
+                                let ny: isize = previous_y as isize - 1;
+                                if ny >= 0{
+                                    
+                                    
+                                    let mut up: [isize; 3] = [-1, 0, 1];
+                                    up.shuffle(&mut rng);
+                                    
+                                    for dx in up{
+                                        let nx = previous_x as isize + dx; 
+                                        if nx >= 0 && nx < GRID_WIDTH as isize - 1{
+                                            
+                                            if grid[ny as usize][nx as usize].is_none(){
+                                                println!("cellule vide");
+                                                final_x = nx as usize;
+                                                final_y = ny as usize;
+                                                draw_movment_and_activate_chunks(chunks_up, image_data, previous_x , previous_y, final_x, final_y, chunk_x, chunk_y);
+                                                break
+                                            }
+                                            else{
+                                                println!("cellule occupée");
+                                            }
+                                        }
+                                    }
+                                } 
+                                grid[final_y][final_x] = Some(p);
+                                //println!("put it back as it did not die");
                             }
+                        } else{
+                            //println!("put it back because not fire");
+                            grid[final_y][final_x] = Some(p);
                         }
+                        
                     }
                 }
             }
         }
     }
-    */
-}
-
-fn _update_fire_particle(p: &mut Particle){
-    if p.lifespan == 0{ // kill the particle
-        return 
-    }
+    
 }
 
 
@@ -434,14 +473,14 @@ fn window_conf() -> Conf {
     }
 }
 
-fn handle_mouse_input(chunks: &mut Vec<Vec<bool>>, previous_pos: &mut (isize, isize), image: &mut Image, current_particle_type: &usize, grid: &mut Vec<Vec<Option<Particle>>>){
+fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isize, isize), image: &mut Image, current_particle_type: &usize, grid: &mut Vec<Vec<Option<Particle>>>, chunks_up: &mut Vec<Vec<bool>>){
     let image_data: &mut [[u8; 4]] = image.get_image_data_mut();
     let mut path_buffer: Vec<(isize, isize)> =  Vec::new();
     if is_mouse_button_down(MouseButton::Left) || is_mouse_button_down(MouseButton::Right){
         let (mouse_x, mouse_y) = mouse_position();
         let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
         let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
-        let radius = 10;
+        let radius = 0;
         if previous_pos.0 != -1{
             get_line(previous_pos.0, previous_pos.1, grid_x, grid_y, &mut path_buffer);
             for (x, y) in path_buffer{
@@ -500,7 +539,23 @@ fn handle_mouse_input(chunks: &mut Vec<Vec<bool>>, previous_pos: &mut (isize, is
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
                                     }
-                                    chunks[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
+                                    else if *current_particle_type == FIRE_ID{
+                                        let (r, g, b) = *FIRE_COLORS.choose(&mut thread_rng()).unwrap();
+                                        if let Some(pixel_slice) = image_data.get_mut(target_grid_x as usize + target_grid_y as usize * GRID_WIDTH) {
+                                            *pixel_slice = [r, g, b, 255]; 
+                                        }
+                                        let new_particle = create_particle(
+                                            FIRE_ID,
+                                            target_grid_x as f32,
+                                            target_grid_y as f32,
+                                            0.0,    
+                                            0.0,
+                                            40,
+                                        );
+                                        grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                    }
+                                    chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
+                                    chunks_up[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                 }
                             }
                         }
@@ -519,7 +574,8 @@ fn handle_mouse_input(chunks: &mut Vec<Vec<bool>>, previous_pos: &mut (isize, is
                                         *pixel_slice = [0, 0, 0, 255]; 
                                     }
                                     grid[target_grid_y as usize][target_grid_x as usize] = None;
-                                    chunks[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;                                    
+                                    chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;                                    
+                                    chunks_up[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;                                    
                                 }
                             }
                         }
@@ -543,13 +599,17 @@ fn handle_keyboard_input(current_particle_type: &mut usize){
     else if is_key_pressed(KeyCode::Key3){
         *current_particle_type = STONE_ID;
     }
+    else if is_key_pressed(KeyCode::Key4){
+        *current_particle_type = FIRE_ID;
+    }
 }
 
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut grid: Vec<Vec<Option<Particle>>> = vec![vec![None; GRID_WIDTH as usize]; GRID_HEIGHT as usize];
     let mut bytes: Vec<u8> = Vec::new();
-    let mut chunks: Vec<Vec<bool>> = vec![vec![false; CHUNKS_X]; CHUNKS_Y];
+    let mut chunks_down: Vec<Vec<bool>> = vec![vec![false; CHUNKS_X]; CHUNKS_Y];
+    let mut chunks_up: Vec<Vec<bool>> = vec![vec![false; CHUNKS_X]; CHUNKS_Y];
     let mut previous_pos: (isize, isize) = (-1, -1);
     let mut current_particle_type: usize = SAND_ID;
     //set_fullscreen(true);
@@ -565,11 +625,11 @@ async fn main() {
     loop {
         let start_time = Instant::now();    
         //let start_update_time = Instant::now();
-        update_particles(&mut chunks, &mut game_image, &mut grid);
+        update_particles(&mut chunks_down, &mut game_image, &mut grid,  &mut chunks_up);
         //let end_update_time = Instant::now();
         //println!("update time: {}", end_update_time.duration_since(start_update_time).as_millis());
         
-        handle_mouse_input(&mut chunks, &mut previous_pos, &mut game_image, &current_particle_type, &mut grid);
+        handle_mouse_input(&mut chunks_down, &mut previous_pos, &mut game_image, &current_particle_type, &mut grid, &mut chunks_up);
 
         handle_keyboard_input(&mut current_particle_type);
         
@@ -589,7 +649,7 @@ async fn main() {
         );
         for chunk_y in (0..CHUNKS_Y as usize).rev() { 
             for chunk_x in 0..CHUNKS_X as usize { 
-                if chunks[chunk_y][chunk_x] {
+                if chunks_down[chunk_y][chunk_x] {
                     draw_rectangle_lines(
                         (chunk_x * CHUNK_SIZE * CELL_SIZE) as f32,
                         (chunk_y * CHUNK_SIZE * CELL_SIZE) as f32,
@@ -597,6 +657,16 @@ async fn main() {
                         (CHUNK_SIZE * CELL_SIZE) as f32,
                         2.0,
                         RED,
+                    )
+                }
+                if chunks_up[chunk_y][chunk_x] {
+                    draw_rectangle_lines(
+                        (chunk_x * CHUNK_SIZE * CELL_SIZE) as f32,
+                        (chunk_y * CHUNK_SIZE * CELL_SIZE) as f32,
+                        (CHUNK_SIZE * CELL_SIZE) as f32,
+                        (CHUNK_SIZE * CELL_SIZE) as f32,
+                        2.0,
+                        GREEN,
                     )
                 }
             }

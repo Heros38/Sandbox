@@ -16,7 +16,9 @@ const _CHROMATIC_ID: usize = 6;
 const _WOOD_ID: usize = 7;
 const SCREEN_WIDTH: usize = 1600;
 const SCREEN_HEIGHT: usize = 800;
-const CELL_SIZE: usize = 5;
+
+const CELL_SIZE: usize = 2;
+
 const GRID_WIDTH: usize = SCREEN_WIDTH / CELL_SIZE;
 const GRID_HEIGHT: usize = SCREEN_HEIGHT / CELL_SIZE;
 const GRAVITY: f32 = 0.2;
@@ -120,6 +122,13 @@ fn create_particle(
         vx,
         vy,
         lifespan,
+    }
+}
+
+fn is_type(grid: &Vec<Vec<Option<Particle>>>, x: usize, y: usize, check_type_id: usize) -> bool {
+    match grid[y][x].as_ref() {
+        Some(particle) => particle.type_id == check_type_id,
+        None => false, 
     }
 }
 
@@ -273,8 +282,8 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                                 if collision{
                                     p.tx = final_x as f32;
                                     p.ty = final_y as f32;
-                                    p.vx = 0.0;
-                                    p.vy = 0.0;
+                                    p.vx *= 0.8;
+                                    p.vy *= 0.8;
 
                                 } else{
                                     if grid[final_y][final_x].is_none(){
@@ -286,7 +295,11 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                                         p.ty = target_ty;
                                         p.vx *= 0.6;
                                         p.vy *= 0.6;
-                                        grid[previous_y][previous_x] = grid[final_y as usize][final_x as usize].take();
+                                        if let Some(mut water_particle) = grid[final_y][final_x].take(){
+                                            water_particle.tx = previous_x as f32;
+                                            water_particle.ty = previous_y as f32;
+                                            grid[previous_y][previous_x] = Some(water_particle);
+                                        }
                                     }
                                 }
                             }
@@ -305,7 +318,7 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                                         if target_x >= 0 && target_x < GRID_WIDTH as isize &&
                                         target_y >= 0 && target_y < GRID_HEIGHT as isize {
                                             
-                                            if grid[target_y as usize][target_x as usize].is_none() && (grid[previous_y as usize][target_x as usize].is_none() || grid[target_y as usize][previous_x as usize].is_none()){ // TODO: NEEDS TO CHECK FOR STONE 
+                                            if grid[target_y as usize][target_x as usize].is_none() && (!is_type(grid, previous_x, target_y as usize, STONE_ID) || !is_type(grid, target_x as usize, previous_y, STONE_ID)){  
                                                 final_x = target_x as usize;
                                                 final_y = target_y as usize;
                                                 p.tx = final_x as f32;
@@ -339,7 +352,7 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                                     if target_x >= 0 && target_x < GRID_WIDTH as isize &&
                                     target_y >= 0 && target_y < GRID_HEIGHT as isize {
                                         
-                                        if grid[target_y as usize][target_x as usize].is_none() && ((grid[previous_y as usize][target_x as usize].is_none()) || grid[target_y as usize][previous_x as usize].is_none()) { // TODO: NEEDS TO CHECK FOR STONE 
+                                        if grid[target_y as usize][target_x as usize].is_none() && (!is_type(grid, previous_x, target_y as usize, STONE_ID) || !is_type(grid, target_x as usize, previous_y, STONE_ID)) { 
                                             final_x = target_x as usize;
                                             final_y = target_y as usize;
                                             p.tx = final_x as f32;
@@ -376,9 +389,6 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                             grid[final_y][final_x] = Some(p);
                         }
                         else{
-                            if p.type_id == FIRE_ID{
-                                chunks_down[chunk_y][chunk_x] = true;
-                            }
                             grid[y_global][x_global] = Some(p);
                         }
                     }
@@ -430,14 +440,10 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                                         if nx >= 0 && nx < GRID_WIDTH as isize - 1{
                                             
                                             if grid[ny as usize][nx as usize].is_none(){
-                                                println!("cellule vide");
                                                 final_x = nx as usize;
                                                 final_y = ny as usize;
                                                 draw_movment_and_activate_chunks(chunks_up, image_data, previous_x , previous_y, final_x, final_y, chunk_x, chunk_y);
                                                 break
-                                            }
-                                            else{
-                                                println!("cellule occupée");
                                             }
                                         }
                                     }
@@ -447,7 +453,7 @@ fn update_particles(chunks_down: &mut Vec<Vec<bool>>, image: &mut Image, grid: &
                             }
                         } else{
                             //println!("put it back because not fire");
-                            grid[final_y][final_x] = Some(p);
+                            grid[previous_y][previous_x] = Some(p);
                         }
                         
                     }
@@ -480,7 +486,7 @@ fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isiz
         let (mouse_x, mouse_y) = mouse_position();
         let grid_x = (mouse_x / CELL_SIZE as f32) as isize;
         let grid_y = (mouse_y / CELL_SIZE as f32) as isize;
-        let radius = 0;
+        let radius = 10;
         if previous_pos.0 != -1{
             get_line(previous_pos.0, previous_pos.1, grid_x, grid_y, &mut path_buffer);
             for (x, y) in path_buffer{
@@ -508,6 +514,7 @@ fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isiz
                                             0,
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                        chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                     }
                                     else if *current_particle_type == WATER_ID{
                                         let (r, g, b) = *WATER_COLORS.choose(&mut thread_rng()).unwrap();
@@ -523,6 +530,7 @@ fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isiz
                                             0,
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                        chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                     } 
                                     else if *current_particle_type == STONE_ID{
                                         let (r, g, b) = *STONE_COLORS.choose(&mut thread_rng()).unwrap();
@@ -538,6 +546,7 @@ fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isiz
                                             0,
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                        //chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                     }
                                     else if *current_particle_type == FIRE_ID{
                                         let (r, g, b) = *FIRE_COLORS.choose(&mut thread_rng()).unwrap();
@@ -553,9 +562,10 @@ fn handle_mouse_input(chunks_down: &mut Vec<Vec<bool>>, previous_pos: &mut (isiz
                                             40,
                                         );
                                         grid[target_grid_y as usize][target_grid_x as usize] = Some(new_particle);
+                                        chunks_up[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
                                     }
-                                    chunks_down[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
-                                    chunks_up[target_grid_y as usize / CHUNK_SIZE][target_grid_x as usize / CHUNK_SIZE] = true;
+                                    
+                                    
                                 }
                             }
                         }
